@@ -1,0 +1,10 @@
+{
+  "name": "issuedesk-codex-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Project-local Codex CLI for subscription-authenticated editorial analysis",
+  "dependencies": {
+    "@openai/codex": "0.153.4",
+    "playwright": "1.61.0"
+  }
+}

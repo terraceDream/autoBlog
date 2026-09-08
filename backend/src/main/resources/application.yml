@@ -1,0 +1,20 @@
+server:
+  address: 127.0.0.1
+  port: ${PORT:8080}
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/issuedesk;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ''
+  jackson:
+    default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: true
+app:
+  analysis:
+    codex-executable: ${CODEX_EXECUTABLE:}
+    timeout-seconds: 300
+  youtube-key: ${YOUTUBE_API_KEY:}
+  naver-client-id: ${NAVER_CLIENT_ID:}
+  naver-client-secret: ${NAVER_CLIENT_SECRET:}

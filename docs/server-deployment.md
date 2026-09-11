@@ -33,3 +33,15 @@
 
 ## 비밀번호 변경
 서버에서 `sudo htpasswd /etc/nginx/autoblog.htpasswd owner`로 변경한다(apache2-utils 필요). 비밀번호를 명령 인자로 전달하거나 Git에 기록하지 않는다. Chrome 연결 토큰은 로그인 비밀번호와 별도이며, 확장 ZIP 역시 공유하지 않는다.
+
+## 배포 검증 기록 — 2026-09-11
+- 실제 서버 메모리 4GB, 초기 사용 가능 약 2.5GB. 첫 분석 후 autoBlog 약 188MB 사용.
+- PostgreSQL의 모든 autoBlog 테이블 소유자는 `autoblog`; 해당 계정이 읽을 수 있는 Festival public 테이블은 0개.
+- 이관 10개 테이블의 건수를 트랜잭션 안에서 검증했다. 스키마 백업을 생성하고 `pg_restore --list`로 아카이브를 읽을 수 있음을 확인했다. 전체 복구 훈련은 아직 수행하지 않았다.
+- 인증 없이 API 접근 401, 잘못된 확장 토큰 403, 다른 Origin의 쓰기 403, 인증한 페이지와 API는 200. Festival HTTPS도 200.
+- 서버에서 실제 분석 성공(입력 6,438 / 출력 745 토큰). 이후 기존 GPT 모델 설정을 서버 영속 볼륨으로 옮긴 뒤에도 재배포 후 분석에 성공했다(입력 6,433 / 출력 959 토큰).
+- 첫 Actions 빌드·배포 성공: https://github.com/terraceDream/autoBlog/actions/runs/34558885996
+- Festival 설정 보완 및 재배포도 성공: https://github.com/terraceDream/Festv/actions/runs/34558861877
+- 백엔드 테스트 41개 통과·1개 opt-in 건너뜀, Chrome 연결·새 글·표 보존 테스트 3개 통과, 프런트 빌드 성공.
+- IP 인증서 발급뿐 아니라 Certbot 갱신 dry-run도 성공했다. 서버 시간대는 Asia/Seoul이며 백업 cron은 `30 3 * * *`이다.
+- 로컬의 기존 확장 폴더에 서버용 ZIP을 적용했다. 실제 Chrome 확장 새로고침과 게시 확인은 사용자가 로그인된 Chrome에서 수행해야 한다. 이 배포 검증에서 새 게시물은 올리지 않았다.

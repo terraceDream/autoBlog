@@ -17,6 +17,9 @@ public class Store {
     final ObjectMapper json;
     public Store(JdbcTemplate db, ObjectMapper json) { this.db=db; this.json=json; }
     public JdbcTemplate jdbc() { return db; }
+    String encode(Map<String,?> value) {
+        try {return json.writeValueAsString(value);}catch(Exception e){throw new IllegalArgumentException("데이터 형식이 잘못되었습니다.");}
+    }
     String encode(List<String> value) {
         try { return json.writeValueAsString(value.stream().map(String::trim).distinct().toList()); }
         catch(Exception e) { throw new IllegalArgumentException("목록 형식이 잘못되었습니다."); }

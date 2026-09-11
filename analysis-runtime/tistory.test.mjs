@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {savePrivate} from './tistory.mjs';
+import {savePrivate,verifyImages} from './tistory.mjs';
 
 test('never saves when private visibility is not verified',async()=>{
  const actions=[];
@@ -12,4 +12,12 @@ test('navigation without matching private row is not reported as saved',async()=
  const locator={filter:()=>locator,count:async()=>0,waitFor:async()=>{}};
  const page={getByRole:()=>({click:async()=>{},check:async()=>{},isChecked:async()=>true,waitFor:async()=>{}}),waitForURL:async()=>{},getByText:()=>({}),locator:()=>locator};
  await assert.rejects(()=>savePrivate(page,{blogUrl:'https://test.tistory.com',title:'제목'}),/visibility could not be verified/);
+});
+
+test('missing or unloaded images stop before save',async()=>{
+ for(const images of [[],[{src:'https://example.com/a.jpg',loaded:false}],[{src:'https://example.com/other.jpg',loaded:true}]]){
+  const body={locator:()=>({evaluateAll:async()=>images})};
+  await assert.rejects(()=>verifyImages(body,['https://example.com/a.jpg']),/Image verification failed/);
+ }
+ await verifyImages({locator:()=>({evaluateAll:async()=>[{src:'https://example.com/a.jpg',loaded:true}]})},['https://example.com/a.jpg']);
 });

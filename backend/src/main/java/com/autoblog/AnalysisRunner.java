@@ -7,6 +7,7 @@ public interface AnalysisRunner {
     record Availability(boolean ready,String message) {}
     record Output(String json,Long inputTokens,Long outputTokens,Long cachedTokens) {}
     Availability availability();
+    default boolean isBusy(){return false;}
     Output analyze(String prompt,JsonNode schema,BooleanSupplier cancelled) throws Exception;
     class Failure extends Exception {
         public final String status;

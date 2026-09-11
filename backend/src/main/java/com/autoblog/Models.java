@@ -18,7 +18,7 @@ public final class Models {
         @NotBlank @Size(max=80) String timezone) {}
     public record SourceInput(
         @NotBlank @Size(max=160) String name,
-        @NotBlank @Pattern(regexp="RSS|YOUTUBE|NAVER_NEWS|NAVER_BLOG") String type,
+        @NotBlank @Pattern(regexp="RSS|HN_SEARCH|YOUTUBE|NAVER_NEWS|NAVER_BLOG") String type,
         @NotBlank @Pattern(regexp="NEWS|BLOG|VIDEO|OTHER") String media,
         @NotNull @Size(max=2048) String url, @NotNull @Size(max=500) String query,
         @NotNull @Size(max=100) String channelId, boolean enabled) {}
@@ -31,7 +31,9 @@ public final class Models {
         String region, boolean active, boolean scheduleEnabled, String cron, String timezone,
         String nextRun, String createdAt, String updatedAt, long articleCount, long sourceCount) {}
     public record Candidate(String title, String url, String author, String externalId,
-        String excerpt, Instant publishedAt) {}
+        String excerpt, Instant publishedAt, java.util.Map<String,Object> signals) {
+        public Candidate(String title,String url,String author,String externalId,String excerpt,Instant publishedAt){this(title,url,author,externalId,excerpt,publishedAt,java.util.Map.of());}
+    }
     public record Module(String type, String name, String description, boolean ready, String setup) {}
     public record Page<T>(List<T> items, long total, int page, int size) {}
 }

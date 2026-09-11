@@ -9,7 +9,15 @@ if (Test-Path -LiteralPath (Join-Path $taskRoot '.env')) {
         }
     }
 }
-foreach ($taskPort in @(8080,5173)) {
+if ($env:JAVA_HOME) {
+    $taskJavaBin = Join-Path $env:JAVA_HOME 'bin'
+    if (-not (Test-Path -LiteralPath (Join-Path $taskJavaBin 'java.exe'))) {
+        throw 'JAVA_HOME must point to an installed JDK.'
+    }
+    $env:Path = "$taskJavaBin;$env:Path"
+}
+$taskFrontendPort = if ($env:FRONTEND_PORT) { [int]$env:FRONTEND_PORT } else { 5173 }
+foreach ($taskPort in @(8080,$taskFrontendPort)) {
     if (Get-NetTCPConnection -LocalPort $taskPort -State Listen -ErrorAction SilentlyContinue) { throw "Port $taskPort is in use. Stop the existing server first." }
 }
 if (-not $SkipInstall) {
@@ -35,5 +43,5 @@ for ($taskAttempt=0; $taskAttempt -lt 60; $taskAttempt++) {
     Start-Sleep -Seconds 1
 }
 if (-not $taskReady) { throw 'Backend startup failed. See .tools/backend.log and .tools/backend-error.log.' }
-Write-Host 'Issue Desk is ready: http://127.0.0.1:5173'
+Write-Host "Issue Desk is ready: http://127.0.0.1:$taskFrontendPort"
 Write-Host 'Stop with: .\scripts\stop.ps1'

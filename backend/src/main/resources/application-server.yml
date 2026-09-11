@@ -1,0 +1,12 @@
+server:
+  address: 0.0.0.0
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+  flyway:
+    default-schema: autoblog
+    schemas: autoblog
+app:
+  public-origin: ${PUBLIC_ORIGIN}
+  browser-directory: /state/chrome-extension

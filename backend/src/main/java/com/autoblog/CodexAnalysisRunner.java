@@ -63,6 +63,7 @@ public class CodexAnalysisRunner implements AnalysisRunner {
             return new Availability(ready,ready?"ChatGPT 구독 로그인 확인됨":"Codex CLI에서 ChatGPT로 로그인해 주세요. API 키 인증은 사용하지 않습니다.");
         } catch(Exception e) {return new Availability(false,"Codex CLI 설치와 ChatGPT 로그인 상태를 확인해 주세요.");}
     }
+    public boolean isBusy(){return inferenceBusy.get();}
     public Output analyze(String prompt,JsonNode schema,BooleanSupplier cancelled) throws Exception {
         if(!inferenceBusy.compareAndSet(false,true))throw new Failure("FAILED","다른 AI 분석 또는 글 작성이 진행 중입니다. 완료 후 다시 실행해 주세요.");
         try{return runAnalysis(prompt,schema,cancelled);}finally{inferenceBusy.set(false);}

@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Issue Desk · 기존 Chrome 연결",
+  "version": "1.2.0",
+  "content_scripts": [{"matches":["https://*.tistory.com/manage/newpost*"],"js":["new-draft.js"],"run_at":"document_start","world":"MAIN"}],
+  "minimum_chrome_version": "120",
+  "description": "현재 Chrome 로그인 세션에서 Issue Desk 초안을 티스토리에 비공개 저장합니다. 창과 탭을 닫지 않습니다.",
+  "permissions": ["scripting", "alarms", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "https://*.tistory.com/*"],
+  "background": {"service_worker": "worker.js", "type": "module"},
+  "action": {"default_title": "Issue Desk 연결 확인"}
+}

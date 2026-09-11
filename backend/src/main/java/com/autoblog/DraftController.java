@@ -10,4 +10,5 @@ public class DraftController {
  @GetMapping("/{id}") Object get(@PathVariable String id){return service.get(id);}
  @PutMapping("/{id}") Object save(@PathVariable String id,@Valid @RequestBody Content r){return service.save(id,r);}
  @PostMapping("/{id}/tistory") Object send(@PathVariable String id,@Valid @RequestBody Publish r){return service.publish(id,r);}
+ @PostMapping("/{id}/retry") Object retry(@PathVariable String id,@RequestBody java.util.Map<String,Boolean> r){return service.retry(id,Boolean.TRUE.equals(r.get("confirmedNotSaved")));}
 }

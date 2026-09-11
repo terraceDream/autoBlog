@@ -21,12 +21,16 @@ import static com.autoblog.Models.*;
 @Service
 public class CollectionService {
     private final Store store;
+    private final SourceDiscovery discovery;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    public record Finished(String topicId,String runId) {}
     private final Map<String,Collector> collectors=new LinkedHashMap<>();
     private final TransactionTemplate tx;
     private final Set<String> active=ConcurrentHashMap.newKeySet();
     // One writer avoids content deduplication races; bounded admission prevents unbounded jobs.
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    public CollectionService(Store store,List<Collector> modules,PlatformTransactionManager manager) {
+    public CollectionService(Store store,List<Collector> modules,PlatformTransactionManager manager,SourceDiscovery discovery,org.springframework.context.ApplicationEventPublisher events) {
+        this.discovery=discovery;this.events=events;
         this.store=store; modules.forEach(c->collectors.put(c.info().type(),c)); tx=new TransactionTemplate(manager);
     }
     @PostConstruct void recover() { store.jdbc().update("UPDATE runs SET status='FAILED', finished_at=?, message=? WHERE status IN ('QUEUED','RUNNING')",Instant.now().toString(),"서버가 재시작되어 중단되었습니다. 다시 수집해 주세요."); }
@@ -36,6 +40,7 @@ public class CollectionService {
     public synchronized String start(String topicId,String trigger) {
         Topic topic=store.topic(topicId);
         if(!topic.active()) throw Store.bad("중지된 분야입니다. 활성화 후 수집해 주세요.");
+        if(discovery.automatic(topicId))discovery.configure(topicId);
         var sources=store.sources(topicId).stream().filter(Source::enabled).toList();
         if(sources.isEmpty()) throw Store.bad("활성화된 수집 출처를 먼저 추가해 주세요.");
         if(active.contains(topicId)) throw new ResponseStatusException(HttpStatus.CONFLICT,"이미 수집 중인 분야입니다.");
@@ -82,11 +87,12 @@ public class CollectionService {
                                 articleId=UUID.randomUUID().toString();
                                 store.jdbc().update("INSERT INTO articles(id,canonical_url,url_hash,title,url,media,source_name,author,external_id,excerpt,coverage,published_at,collected_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",articleId,canonical,hash,cut(c.title(),2000),cut(c.url(),2048),source.media(),cut(source.name(),300),cut(c.author(),500),cut(c.externalId(),2048),cut(c.excerpt(),20000),"EXCERPT",c.publishedAt()==null?null:c.publishedAt().toString(),Instant.now().toString());
                             } else articleId=ids.get(0);
+                            if(c.signals()!=null&&!c.signals().isEmpty())store.jdbc().update("UPDATE articles SET signals=? WHERE id=?",store.encode(c.signals()),articleId);
                             Integer count=store.jdbc().queryForObject("SELECT COUNT(*) FROM topic_articles WHERE topic_id=? AND article_id=?",Integer.class,topic.id(),articleId);
                             if(count!=null&&count>0) duplicates++;
                             else { store.jdbc().update("INSERT INTO topic_articles(topic_id,article_id,matched_keywords,status) VALUES(?,?,?,'UNREAD')",topic.id(),articleId,store.encode(matched)); added++; }
                         }
-                        String message=source.type().startsWith("NAVER")?"검색어당 최신 최대 100건을 조회했습니다.":source.type().equals("YOUTUBE")?"최신 최대 50건의 영상 정보를 조회했습니다.":"피드의 최신 최대 200건을 조회했습니다.";
+                        String message=source.type().startsWith("NAVER")?"검색어당 최신 최대 100건을 조회했습니다.":source.type().equals("YOUTUBE")?"최신 최대 50건의 영상 정보를 조회했습니다.":source.type().equals("HN_SEARCH")?"최근 30일의 검색 결과 최대 50건과 관심 신호를 조회했습니다.":"피드의 최신 최대 200건을 조회했습니다.";
                         store.jdbc().update("UPDATE run_sources SET status='SUCCESS', fetched=?,added=?,duplicates=?,filtered=?,message=? WHERE id=?",fetched.size(),added,duplicates,filtered,message,rowId);
                         store.jdbc().update("UPDATE sources SET last_success=? WHERE id=?",Instant.now().toString(),source.id());
                     });
@@ -101,7 +107,7 @@ public class CollectionService {
             store.jdbc().update("UPDATE runs SET status=?,finished_at=?,message=? WHERE id=?",failures==0?"SUCCESS":failures==sources.size()?"FAILED":"PARTIAL",Instant.now().toString(),failures==0?"수집이 완료되었습니다.":failures+"개 출처에서 수집에 실패했습니다.",runId);
         } catch(Exception e) {
             store.jdbc().update("UPDATE runs SET status='FAILED',finished_at=?,message=? WHERE id=?",Instant.now().toString(),"수집 실행이 중단되었습니다.",runId);
-        } finally { active.remove(topic.id()); }
+        } finally { active.remove(topic.id());events.publishEvent(new Finished(topic.id(),runId)); }
     }
     @Scheduled(fixedDelay=30000,initialDelay=30000)
     public void scheduled() {

@@ -12,7 +12,8 @@ public class OriginalReader {
     public OriginalReader(SafeHttp http){this.http=http;}
     public Map<String,Object> read(JsonNode source) {
         String url=source.path("url").asText(),text=source.path("excerpt").asText();
-        String coverage="EXCERPT",message="저장된 발췌문만 참고했습니다.";
+        List<Map<String,String>> images=new ArrayList<>();
+        String coverage="EXCERPT",message="원문 본문을 추출하지 못했습니다. 저장된 발췌문만 있어 글 작성에 사용하지 않습니다.";
         try {
             String host=java.net.URI.create(url).getHost();
             if(host==null||host.equals("youtu.be")||host.equals("youtube.com")||host.endsWith(".youtube.com"))throw new IllegalArgumentException();
@@ -20,10 +21,14 @@ public class OriginalReader {
             document.select("script,style,nav,header,footer,aside,form,noscript,iframe").remove();
             var article=document.selectFirst("article");if(article==null)article=document.selectFirst("main");
             if(article==null)throw new IllegalArgumentException();
+            for(var img:article.select("img")) {
+                String imageUrl=img.absUrl("src");if(imageUrl.isBlank())imageUrl=img.absUrl("data-src");
+                if(imageUrl.startsWith("https://")&&images.size()<6)images.add(Map.of("url",imageUrl,"caption",img.attr("alt"),"sourceUrl",url));
+            }
             String extracted=article.text();if(extracted.length()<200)throw new IllegalArgumentException();
-            text=AnalysisService.cut(extracted,8000);coverage="ORIGINAL_EXTRACT";
-            message=extracted.length()>8000?"원문 추출 내용 중 앞 8,000자를 참고합니다.":"공개 원문에서 본문을 추출했습니다. 추출 누락 가능성이 있습니다.";
+            text=extracted;coverage="ORIGINAL_EXTRACT";
+            message="공개 페이지에서 추출한 본문 전체 "+extracted.length()+"자를 전달합니다. 동적 로딩·별도 페이지 내용은 포함되지 않을 수 있습니다.";
         }catch(Exception ignored){}
-        return Map.of("id",source.path("id").asText(),"title",source.path("title").asText(),"url",url,"text",text,"coverage",coverage,"message",message);
+        return Map.of("id",source.path("id").asText(),"title",source.path("title").asText(),"url",url,"text",text,"coverage",coverage,"message",message,"imageCandidates",images);
     }
 }

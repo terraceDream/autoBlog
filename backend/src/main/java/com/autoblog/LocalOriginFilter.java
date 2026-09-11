@@ -11,13 +11,21 @@ import java.util.Set;
 /** Local single-user app: reject cross-site browser writes without exposing a public API. */
 @Component
 public class LocalOriginFilter extends OncePerRequestFilter {
+    @org.springframework.beans.factory.annotation.Value("${FRONTEND_PORT:5173}")
+    private int frontendPort;
+    @org.springframework.beans.factory.annotation.Value("${app.public-origin:}")
+    private String publicOrigin;
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
         String origin=request.getHeader("Origin");
+        // Extension writes have independent token authentication in the controller.
+        if(request.getRequestURI().startsWith("/api/tistory-browser/") && "POST".equals(request.getMethod())) {
+            chain.doFilter(request,response);return;
+        }
         if(!Set.of("GET","HEAD","OPTIONS").contains(request.getMethod())&&origin!=null) {
             boolean allowed=false;
             try {
                 URI uri=URI.create(origin);
-                allowed=Set.of("localhost","127.0.0.1").contains(uri.getHost())&&"http".equals(uri.getScheme())&&(uri.getPort()==5173||uri.getPort()==request.getServerPort());
+                allowed=publicOrigin!=null&&!publicOrigin.isBlank() ? publicOrigin.equals(origin) : Set.of("localhost","127.0.0.1").contains(uri.getHost())&&"http".equals(uri.getScheme())&&(uri.getPort()==frontendPort||uri.getPort()==request.getServerPort());
             } catch(Exception ignored) {}
             if(!allowed) {response.setStatus(403);response.setContentType("application/json;charset=UTF-8");response.getWriter().write("{\"message\":\"허용되지 않은 요청 출처입니다.\"}");return;}
         }

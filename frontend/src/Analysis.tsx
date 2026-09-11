@@ -104,7 +104,10 @@ export function AnalysisDialog({
         if (current) setReady(v);
       })
       .catch((e) => {
-        if (current) setError(e.message);
+        if (current) {
+          setReady({ready:false,message:'서버 연결 실패 · Codex 로그인 상태를 확인하지 못했습니다.'});
+          setError(e.message);
+        }
       });
     return () => {
       current = false;
@@ -451,7 +454,7 @@ export function AnalysisWorkspace({
           })}
         </section>
         <div className="analysis-footnote">
-          분석 시점 {date(detail.job.createdAt)} · {detail.job.mode === 'QUICK' ? '빠른 정리' : '상세 기획'}
+          분석 시점 {date(detail.job.createdAt)} · {detail.job.mode === 'QUICK' ? '빠른 정리' : detail.job.mode === 'FULL' ? '원문 기획' : '상세 기획'}
           {detail.job.direction && <p>디렉션: {detail.job.direction}</p>}
         </div>
       </div>
@@ -501,7 +504,7 @@ export function AnalysisWorkspace({
                 </span>
                 <strong>{job.articleCount}건 분석</strong>
                 <span className="muted">
-                  {job.mode === 'QUICK' ? '빠른 정리' : '상세 기획'} · {date(job.createdAt)}
+                  {job.mode === 'QUICK' ? '빠른 정리' : job.mode === 'FULL' ? '원문 기획' : '상세 기획'} · {date(job.createdAt)}
                 </span>
               </div>
               {running(job) && (

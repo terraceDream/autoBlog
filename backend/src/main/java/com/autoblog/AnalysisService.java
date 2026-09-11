@@ -40,8 +40,18 @@ public class AnalysisService {
         If coverage is EXCERPT, explicitly state that the original text/video has not been reviewed.
         If the excerpt is empty or insufficient, exclude the item or mark a very tentative topic with explicit limitations.
         No finished blog article; produce a concise editorial planning brief.
+        Include editorial for every issue: decision RECOMMEND, HOLD or SKIP; priority 0-100 is editorial suitability, NEVER predicted clicks.
+        Judge reader usefulness (35), topical relevance (25), concrete evidence (25), timely reader question (15).
+        RECOMMEND only when a specific reader benefit and sufficient factual material exist; HOLD for missing evidence; SKIP for weak fit.
+        State reason, readerQuestion, readerBenefit, evidence, openingScene in Korean. openingScene is a plausible reader problem, not fabricated personal experience.
+        Use only supplied signals for observed popularity. Missing metrics mean unknown, not zero interest. Community votes are not Korean search demand.
+        If signals.provider is Hacker News, publishedAt is the community submission date, not necessarily the original publication date. Check dates in the original before claiming a new release or breaking news.
+        Recommend at most THREE issues. Use HOLD or SKIP for remaining issues and explain why. The reader needs a shortlist, not another long inbox.
+        Do not reward sensationalism or invent urgency. Distinguish source claims, editorial inference, and unknowns.
+        Suggested titles promise a specific useful answer that the evidence can deliver. Avoid generic product introductions.
         QUICK: keep each summary around 150 Korean characters, angle around 100, and outline short.
         DETAILED: summaries up to 400 Korean characters, actionable angle and a more specific outline.
+        FULL: review all supplied original text including its final sections before deciding. Do not claim only an excerpt was read when coverage is ORIGINAL_EXTRACT and truncated is false. Missing originals remain EXCERPT and require caution.
         Total output should stay under 16000 characters. Do not add filler to reach any length.
         """;
     public AnalysisService(Store store,ObjectMapper json,Validator validator,AnalysisRunner runner,PlatformTransactionManager manager) throws Exception {
@@ -52,16 +62,16 @@ public class AnalysisService {
     @PreDestroy void shutdown(){active.values().forEach(x->x.set(true));executor.shutdownNow();}
     public Preview preview(Request request) {
         var topic=store.topic(request.topicId());
-        boolean detailed=request.mode().equals("DETAILED");int maxArticles=detailed?10:20,excerptLimit=detailed?2000:600,maxChars=detailed?40000:24000;
+        boolean full=request.mode().equals("FULL"),detailed=request.mode().equals("DETAILED");int maxArticles=full||detailed?10:20,excerptLimit=full?Integer.MAX_VALUE:detailed?2000:600,maxChars=full?120000:detailed?40000:24000;
         var ids=new TreeSet<>(request.articleIds());
         if(ids.size()!=request.articleIds().size())throw Store.bad("같은 자료를 중복 선택할 수 없습니다.");
         if(ids.isEmpty()||ids.size()>maxArticles)throw Store.bad("이 분석 방식은 한 번에 최대 "+maxArticles+"건을 선택할 수 있습니다.");
         List<Source> sources=new ArrayList<>();
         for(String id:ids) {
-            var rows=store.rows("SELECT a.id,a.title,a.url,a.source_name,a.published_at,a.coverage,a.excerpt FROM articles a JOIN topic_articles ta ON ta.article_id=a.id WHERE ta.topic_id=? AND a.id=?",topic.id(),id);
+            var rows=store.rows("SELECT a.id,a.title,a.url,a.source_name,a.published_at,a.coverage,a.excerpt,a.signals FROM articles a JOIN topic_articles ta ON ta.article_id=a.id WHERE ta.topic_id=? AND a.id=?",topic.id(),id);
             if(rows.isEmpty())throw Store.missing("선택한 분야의 자료");var row=rows.get(0);
             String excerpt=Objects.toString(row.get("excerpt"),"");
-            sources.add(new Source(id,cut(Objects.toString(row.get("title"),""),300),Objects.toString(row.get("url"),""),Objects.toString(row.get("sourceName"),""),(String)row.get("publishedAt"),Objects.toString(row.get("coverage"),"EXCERPT"),cut(excerpt,excerptLimit),excerpt.length()>excerptLimit));
+            sources.add(new Source(id,cut(Objects.toString(row.get("title"),""),300),Objects.toString(row.get("url"),""),Objects.toString(row.get("sourceName"),""),(String)row.get("publishedAt"),Objects.toString(row.get("coverage"),"EXCERPT"),cut(excerpt,excerptLimit),excerpt.length()>excerptLimit,signals(row.get("signals"))));
         }
         Input input=new Input(topic.id(),topic.name(),cut(topic.description(),1500),cut(topic.instructions(),3500),topic.tags(),request.mode(),request.direction().trim(),sources);
         String prompt=prompt(input);int chars=prompt.length();
@@ -71,11 +81,13 @@ public class AnalysisService {
         return new Preview(input,chars,maxChars,maxArticles,excerptLimit,(int)sources.stream().filter(Source::truncated).count(),topic.description().length()>1500||topic.instructions().length()>3500,hash,cached.isEmpty()?null:cached.get(0));
     }
     String prompt(Input input) {return INSTRUCTIONS+"\nDATA:\n"+encode(input);}
+    Map<String,Object> signals(Object raw){try{return json.readValue(Objects.toString(raw,"{}"),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});}catch(Exception e){return Map.of();}}
     String encode(Object value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException(e);}}
     public synchronized Map<String,Object> start(Start start) {
         Preview p=preview(start.request());
         if(!p.fingerprint().equals(start.fingerprint()))throw new ResponseStatusException(HttpStatus.CONFLICT,"자료나 분야 설정이 변경되었습니다. 분석 범위를 다시 확인해 주세요.");
         if(p.cachedJobId()!=null)return Map.of("jobId",p.cachedJobId(),"cached",true);
+        if(runner.isBusy())throw Store.bad("다른 AI 작업이 진행 중입니다. 완료 후 다시 시도해 주세요.");
         if(!active.isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"다른 분석이 진행 중입니다. 완료 또는 중단 후 실행해 주세요.");
         String id=UUID.randomUUID().toString();AtomicBoolean cancelled=new AtomicBoolean();active.put(id,cancelled);
         try {

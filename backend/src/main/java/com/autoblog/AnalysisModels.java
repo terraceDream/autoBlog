@@ -9,10 +9,12 @@ public final class AnalysisModels {
     public record Request(
         @NotBlank String topicId,
         @NotNull @Size(min=1,max=20) List<@NotBlank String> articleIds,
-        @NotNull @Pattern(regexp="QUICK|DETAILED") String mode,
+        @NotNull @Pattern(regexp="QUICK|DETAILED|FULL") String mode,
         @NotNull @Size(max=1000) String direction) {}
     public record Source(String id,String title,String url,String sourceName,String publishedAt,
-                         String coverage,String excerpt,boolean truncated) {}
+                         String coverage,String excerpt,boolean truncated,java.util.Map<String,Object> signals) {
+        public Source(String id,String title,String url,String sourceName,String publishedAt,String coverage,String excerpt,boolean truncated){this(id,title,url,sourceName,publishedAt,coverage,excerpt,truncated,java.util.Map.of());}
+    }
     public record Input(String topicId,String topicName,String description,String instructions,
                         List<String> tags,String mode,String direction,List<Source> sources) {}
     public record Preview(Input input,int inputChars,int maxInputChars,int maxArticles,
@@ -32,6 +34,15 @@ public final class AnalysisModels {
         @NotNull @Size(min=1,max=6) List<@NotBlank @Size(max=700) String> keyPoints,
         @NotNull @Size(max=8) List<@NotBlank @Size(max=60) String> tags,
         @NotNull @Size(min=1,max=20) List<@NotBlank String> sourceIds,
-        @NotNull @Size(max=6) List<@NotBlank @Size(max=500) String> uncertainties) {}
+        @NotNull @Size(max=6) List<@NotBlank @Size(max=500) String> uncertainties,
+        @Valid Editorial editorial) {}
+    public record Editorial(
+        @NotBlank @Pattern(regexp="RECOMMEND|HOLD|SKIP") String decision,
+        @Min(0) @Max(100) int priority,
+        @NotBlank @Size(max=500) String reason,
+        @NotBlank @Size(max=500) String readerQuestion,
+        @NotBlank @Size(max=500) String readerBenefit,
+        @NotBlank @Size(max=500) String evidence,
+        @NotBlank @Size(max=500) String openingScene) {}
     public record Excluded(@NotBlank String sourceId,@NotBlank @Size(max=500) String reason) {}
 }

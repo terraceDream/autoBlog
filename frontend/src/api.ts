@@ -81,6 +81,8 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+  }).catch(() => {
+    throw new Error('로컬 서버에 연결할 수 없습니다. Issue Desk 서버를 실행한 뒤 다시 시도해 주세요.');
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

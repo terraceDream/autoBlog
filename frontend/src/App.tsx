@@ -27,11 +27,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { AnalysisDialog, AnalysisWorkspace } from './Analysis';
+import { EditorialWorkbench } from './EditorialWorkbench';
 import { api, date, mediaNames, statusNames } from './api';
 import type { Topic, TopicInput, Source, SourceInput, Article, Module, Run, Page, Stats } from './api';
 
-type Tab = 'results' | 'analysis' | 'sources' | 'settings' | 'history';
+type Tab = 'editorial' | 'results' | 'analysis' | 'sources' | 'settings' | 'history';
 const tabs: { id: Tab; name: string; icon: typeof Search }[] = [
+  { id: 'editorial', name: '추천 작업실', icon: Sparkles },
   { id: 'results', name: '수집 결과', icon: LayoutGrid },
   { id: 'analysis', name: '분석된 소재', icon: Sparkles },
   { id: 'sources', name: '수집 출처', icon: Rss },
@@ -422,7 +424,7 @@ export default function App() {
   const [topics, setTopics] = useState<Topic[]>([]),
     [modules, setModules] = useState<Module[]>([]),
     [topicId, setTopicId] = useState('');
-  const [tab, setTab] = useState<Tab>('results'),
+  const [tab, setTab] = useState<Tab>('editorial'),
     [sources, setSources] = useState<Source[]>([]),
     [articles, setArticles] = useState<Page<Article>>({ items: [], total: 0, page: 0, size: 20 }),
     [runs, setRuns] = useState<Page<Run>>({ items: [], total: 0, page: 0, size: 20 });
@@ -698,7 +700,7 @@ export default function App() {
             </div>
             <h1>어떤 소식을 모아볼까요?</h1>
             <p>
-              분야를 만들고 관심 있는 키워드와 출처를 연결하세요.
+              분야와 관심 키워드를 정하면 원문 발견과 소재 추천을 시작할 수 있습니다.
               <br />
               기사, 블로그, 유튜브를 한곳에서 살펴볼 수 있습니다.
             </p>
@@ -711,11 +713,11 @@ export default function App() {
               </span>
               <ChevronRight size={18} />
               <span>
-                <b>02</b> 출처 연결
+                <b>02</b> 원문 자동 발견
               </span>
               <ChevronRight size={18} />
               <span>
-                <b>03</b> 수집 · 검토
+                <b>03</b> 추천 · 글 작성
               </span>
             </div>
           </div>
@@ -730,28 +732,30 @@ export default function App() {
                   </span>
                 </div>
                 <h1>{topic.name}</h1>
+                <details open={tab !== 'editorial'}><summary>분야 설명과 관심 태그</summary>
                 <p>{topic.description || '분야 설정에서 수집할 내용을 설명해 주세요.'}</p>
                 <div className="head-tags">
                   {topic.tags.map((t) => (
                     <span key={t}># {t}</span>
                   ))}
                 </div>
+                </details>
               </div>
               <div className="head-actions">
                 <button className="button" onClick={() => setTopicModal('edit')}>
                   <SlidersHorizontal size={16} /> 분야 편집
                 </button>
-                <button
+                {tab !== 'editorial' && <button
                   className="button primary"
                   disabled={busy || stats.running || !topic.active || !sources.some((s) => s.enabled)}
                   onClick={() => void collect()}
                 >
                   <RefreshCw size={16} className={stats.running ? 'spin' : ''} />
                   {stats.running ? '수집 중…' : '지금 수집'}
-                </button>
+                </button>}
               </div>
             </section>
-            <div className="stat-grid">
+            {tab !== 'editorial' && <div className="stat-grid">
               <div className="stat">
                 <span>
                   전체 수집 자료
@@ -791,6 +795,7 @@ export default function App() {
                 <small>{topic.scheduleEnabled ? topic.timezone : '필요할 때 직접 실행'}</small>
               </div>
             </div>
+            }
             <div className="tabbar" role="tablist" aria-label="분야 메뉴">
               {tabs.map((t) => (
                 <button
@@ -1116,6 +1121,7 @@ export default function App() {
                   </div>
                 </>
               )}
+              {tab === 'editorial' && <EditorialWorkbench key={topicId} topicId={topicId} onSources={()=>setTab('sources')}/>}
               {tab === 'analysis' && (
                 <AnalysisWorkspace
                   key={topicId}

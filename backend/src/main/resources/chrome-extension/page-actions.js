@@ -49,16 +49,17 @@ export function pageAction(action,payload) {
     }
     if(action==='category'){
       if(!payload.category)return {ok:true};
-      const select=document.querySelector('[role="combobox"][aria-label="카테고리 선택"]');
+      const select=document.querySelector('#category-btn[role="combobox"][aria-controls="category-list"]');
       if(!select)throw Error('카테고리 선택을 직접 확인해 주세요.');
-      if(text(select)===payload.category)return {ok:true};
+      if(text(select.querySelector('.mce-txt'))===payload.category)return {ok:true};
       select.click();return {selectCategory:true};
     }
     if(action==='selectCategory'){
-      const nodes=[...document.querySelectorAll('[role="option"],button,a')].filter(n=>visible(n)&&text(n)===payload.category);
+      const nodes=[...document.querySelectorAll('#category-list [role="option"]')].filter(n=>visible(n)&&text(n)===payload.category);
       if(nodes.length!==1)throw Error('같은 이름의 카테고리를 찾지 못했습니다.');
       nodes[0].click();return {ok:true};
     }
+    if(action==='categoryVerified')return {ready:!payload.category||text(document.querySelector('#category-btn .mce-txt'))===payload.category};
     if(action==='done'){button('완료').click();return {ok:true};}
     const privateInput=[...document.querySelectorAll('input[type="radio"]')].find(n=>{
       const label=[...(n.labels||[])].map(text).join(' ');
@@ -70,12 +71,16 @@ export function pageAction(action,payload) {
       if(!privateInput?.checked)throw Error('비공개가 선택되지 않았습니다.');
       button('비공개 저장').click();return {ok:true};
     }
-    if(action==='saved'){
+    if(action==='existing'||action==='saved'){
       if(!location.pathname.startsWith('/manage/posts'))return {ready:false};
-      const links=[...document.querySelectorAll('a')].filter(n=>text(n)===payload.title&&n.closest('li')?.textContent.includes('비공개'));
-      if(links.length!==1)return {ready:false};
+      if(!document.querySelector('.tit_post'))return {ready:false};
+      const links=[...document.querySelectorAll('.tit_post a')].filter(n=>text(n)===payload.title);
+      if(!links.length)return {ready:action==='existing',found:false};
+      if(links.length!==1)throw Error('같은 제목의 글이 여러 개 있습니다. 중복 저장하지 않았습니다.');
+      const row=links[0].closest('li');
+      if(text(row?.querySelector('.ico_private'))!=='비공개'||(payload.category&&text(row?.querySelector('.txt_cate'))!==payload.category))throw Error('같은 제목의 글이 있지만 비공개 상태 또는 카테고리가 다릅니다. 중복 저장하지 않았습니다.');
       const url=new URL(links[0].href,location.href);
-      return {ready:url.origin===payload.blogUrl,url:url.toString()};
+      return {ready:url.origin===payload.blogUrl,found:true,url:url.toString()};
     }
     return {error:'알 수 없는 편집 작업입니다.'};
   }catch(e){return {error:e.message};}

@@ -23,7 +23,7 @@ export async function run(job){
     const tabs=await chrome.tabs.query({url:p.blogUrl+'/*'});
     // A new tab in the same ordinary Chrome profile shares its existing login cookies.
     // Existing editor tabs and saved posts are never navigated away from or closed.
-    const options={url:p.blogUrl+'/manage/newpost/#issuedesk-new-draft',active:true};
+    const options={url:p.blogUrl+'/manage/posts',active:true};
     if(tabs[0]?.windowId!==undefined)options.windowId=tabs[0].windowId;
     const tab=await chrome.tabs.create(options);
     const action=async name=>{
@@ -39,16 +39,23 @@ export async function run(job){
       while(Date.now()<end){const state=await action(name);if(state.ready)return state;await new Promise(r=>setTimeout(r,500));}
       throw Error('로그인 또는 편집기 상태를 열린 탭에서 확인해 주세요.');
     };
+    const existing=await wait('existing',30);
+    if(existing.found){
+      result={status:'SAVED_PRIVATE',message:'기존 글 목록에서 같은 제목·카테고리의 비공개 글을 확인했습니다. 중복 저장하지 않았습니다.',url:existing.url};
+    }else{
+    await chrome.tabs.update(tab.id,{url:p.blogUrl+'/manage/newpost/#issuedesk-new-draft'});
     await wait('ready',30);
     await action('fill');
     await wait('verify',20);
     const category=await action('category');
     if(category.selectCategory){await new Promise(r=>setTimeout(r,300));await action('selectCategory');}
+    await wait('categoryVerified',5);
     await action('done');await wait('privateReady',10);
     const privateState=await action('private');if(!privateState.ok)throw Error('비공개 선택 확인 실패');
     attempted=true;await action('save');
     const saved=await wait('saved',40);
     result={status:'SAVED_PRIVATE',message:'기존 Chrome 세션에서 비공개 저장을 확인했습니다. 브라우저와 탭을 열어 두었습니다.',url:saved.url};
+    }
   }catch(e){result={status:attempted?'UNKNOWN':'EDITOR_READY',message:(attempted?'저장 여부를 확인해 주세요. 자동 재전송하지 않습니다. ':'아직 저장하지 않았습니다. ')+String(e.message).slice(0,400),url:p.blogUrl+'/manage/posts/'};}
   const record={id:job.id,result};await chrome.storage.local.set({inFlight:record});await deliver(record);
 }

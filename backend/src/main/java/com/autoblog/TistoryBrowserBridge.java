@@ -62,7 +62,7 @@ public class TistoryBrowserBridge {
         }
         return bytes.toByteArray();
     }
-    public synchronized Map<String,Object> status(){return Map.of("ready",ready(),"extensionPath",extensionPath.toString(),"version",version,"updateRequired",!version.equals("1.2.0"));}
+    public synchronized Map<String,Object> status(){return Map.of("ready",ready(),"extensionPath",extensionPath.toString(),"version",version,"updateRequired",!version.equals("1.2.1"));}
     public synchronized void version(String version){this.version=version==null?"":version;}
     private boolean ready(){return lastSeen>0&&System.currentTimeMillis()-lastSeen<90000;}
     public synchronized void ensureConnected(){if(!ready())throw Store.bad("로그인된 Chrome에 Issue Desk 연결 확장 프로그램을 설치하고 확장 아이콘을 눌러 주세요. 새 브라우저는 실행하지 않습니다.");}

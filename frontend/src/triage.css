@@ -1,0 +1,221 @@
+.triage-inbox {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.triage-heading h2 {
+  margin: 8px 0;
+  font-size: 26px;
+}
+.triage-heading p,
+.triage-budget p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #647368;
+  margin: 7px 0;
+}
+.triage-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.triage-tiers button {
+  padding: 12px 16px;
+  border: 1px solid #d7e1d8;
+  border-radius: 10px;
+  background: #fff;
+  color: #47594b;
+  cursor: pointer;
+}
+.triage-tiers button.chosen {
+  background: #254c38;
+  color: white;
+  border-color: #254c38;
+}
+.triage-tiers b {
+  margin-left: 8px;
+}
+.triage-budget {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #f4f6f1;
+  padding: 18px;
+  border-radius: 12px;
+}
+.triage-budget > div {
+  flex: 1;
+}
+.triage-budget label {
+  display: grid;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.triage-inbox select,
+.triage-filters input {
+  padding: 10px;
+  border: 1px solid #d1dcd3;
+  border-radius: 8px;
+  background: #fff;
+}
+.triage-filters {
+  display: flex;
+  gap: 12px;
+}
+.triage-filters input {
+  flex: 1;
+  min-width: 200px;
+  width: auto;
+}
+.triage-filters select { width: auto; flex: 0 1 190px; min-width: 160px; }
+.triage-selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border: 1px solid #d6e3d8;
+  border-radius: 10px;
+  background: #eef5ef;
+  font-size: 13px;
+}
+.triage-selection > span {
+  flex: 1;
+  min-width: 200px;
+}
+.triage-cards {
+  display: grid;
+  gap: 14px;
+}
+.triage-card {
+  border: 1px solid #dce3dd;
+  border-radius: 13px;
+  padding: 22px;
+  background: white;
+  min-width: 0;
+}
+.triage-card.t1 {
+  border-left: 4px solid #39845a;
+}
+.triage-card.t2 {
+  border-left: 4px solid #b39a50;
+}
+.triage-card.pending {
+  background: #fafbf9;
+}
+.triage-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #607065;
+}
+.triage-meta .badge {
+  background: #edf2eb;
+}
+.triage-pick {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.triage-card h3 {
+  font-size: 19px;
+  line-height: 1.55;
+  margin: 13px 0 7px;
+  overflow-wrap: anywhere;
+}
+.triage-card h3 a {
+  color: #234931;
+  text-decoration: none;
+}
+.triage-card h3 a:hover {
+  text-decoration: underline;
+}
+.triage-card small {
+  color: #78847a;
+  font-size: 12px;
+}
+.triage-summary {
+  line-height: 1.9;
+  font-size: 15px;
+  color: #344d3b;
+}
+.triage-card dl {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 9px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.triage-card dt {
+  color: #6b776d;
+}
+.triage-card dd {
+  margin: 0;
+}
+.triage-card details {
+  font-size: 13px;
+  color: #627066;
+  line-height: 1.7;
+}
+.triage-original {
+  font-size: 12px;
+  color: #66776b;
+  border-top: 1px solid #edf0ec;
+  padding-top: 12px;
+  margin-bottom: 0;
+}
+.triage-progress {
+  font-size: 13px;
+  background: #f1f4f0;
+  padding: 12px;
+  border-radius: 8px;
+  line-height: 1.7;
+}
+.triage-progress span {
+  display: block;
+  color: #748276;
+}
+.triage-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.triage-empty {
+  padding: 32px;
+  border: 1px dashed #cad7cd;
+  text-align: center;
+}
+.triage-inbox button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .triage-filters input, .triage-filters select { width:100%; min-width:0; flex:auto; }
+  .triage-budget,
+  .triage-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .triage-card {
+    padding: 16px;
+  }
+  .triage-card dl {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .triage-card dt {
+    font-weight: 600;
+    margin-top: 6px;
+  }
+  .triage-pick {
+    margin-left: 0;
+  }
+  .triage-selection > span {
+    flex-basis: 100%;
+  }
+}

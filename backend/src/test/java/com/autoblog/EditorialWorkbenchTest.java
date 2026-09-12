@@ -34,13 +34,16 @@ class EditorialWorkbenchTest {
   assertThat(ranked.get(1).get("reasons").toString()).contains("관심 신호 미확인");
  }
  @Test void preferencePersistsAndDefaultsToManual(){assertThat(workbench.settings(topic).get("automatic")).isEqualTo(false);workbench.settings(topic,"일반 독자",true);assertThat(workbench.settings(topic).get("audience")).isEqualTo("일반 독자");assertThat(discovery.automatic(topic)).isTrue();}
- @Test void oneActionDiscoversCollectsAndStartsEditorialAnalysis()throws Exception{
+ @Test void collectionScreensWithoutStartingExpensiveAnalysis()throws Exception{
   var hit=Map.of("title","AI 모델 운영","url","https://example.com/story","objectID","123","author","writer","story_text","원문 설명 ".repeat(60),"created_at_i",Instant.now().getEpochSecond(),"points",20,"num_comments",4);
   when(http.get(anyString(),anyMap())).thenReturn(json.writeValueAsBytes(Map.of("hits",List.of(hit))));
-  when(runner.analyze(anyString(),any(),any())).thenAnswer(call->{String prompt=call.getArgument(0);var input=json.readTree(prompt.substring(prompt.indexOf("DATA:\n")+6));String source=input.path("sources").get(0).path("id").asText();
-   return new AnalysisRunner.Output(json.writeValueAsString(Map.of("issues",List.of(),"excluded",List.of(Map.of("sourceId",source,"reason","검증용 보류")))),1L,1L,0L);});
+  when(runner.analyze(anyString(),any(),any())).thenAnswer(call->{String prompt=call.getArgument(0);var input=json.readTree(prompt.substring(prompt.indexOf("DATA:\n")+6));var values=json.createArrayNode();
+   for(var source:input.path("sources")){var v=values.addObject();v.put("id",source.path("id").asText());for(String key:List.of("titleKo","summaryKo","reason","readerBenefit","angle","missing"))v.put(key,"제공 설명으로 확인한 AI 모델 운영 자료입니다. 원문 검증이 필요합니다.");v.put("tier","T2").put("score",65).put("confidence","MEDIUM").put("category","개발·자동화");}
+   return new AnalysisRunner.Output(json.createObjectNode().set("items",values).toString(),1L,1L,0L);});
   workbench.start(topic);
-  boolean finished=false;for(int i=0;i<150;i++){var runs=store.rows("SELECT analysis_id FROM editorial_runs WHERE topic_id=?",topic);if(!runs.isEmpty()&&runs.get(0).get("analysisId")!=null){var jobs=store.rows("SELECT status FROM analysis_jobs WHERE id=?",runs.get(0).get("analysisId"));if(jobs.get(0).get("status").equals("SUCCESS")){finished=true;break;}}Thread.sleep(30);}
-  assertThat(finished).isTrue();assertThat(store.topic(topic).articleCount()).isEqualTo(1);assertThat(workbench.candidates(topic).get(0).get("signals").toString()).contains("points=20");verify(runner,times(1)).analyze(anyString(),any(),any());
+  boolean finished=false;for(int i=0;i<200;i++){var runs=store.rows("SELECT status FROM triage_runs WHERE topic_id=?",topic);if(!runs.isEmpty()&&runs.get(0).get("status").equals("SUCCESS")){finished=true;break;}Thread.sleep(30);}
+  assertThat(finished).isTrue();assertThat(store.topic(topic).articleCount()).isEqualTo(1);
+  assertThat(store.jdbc().queryForObject("SELECT COUNT(*) FROM analysis_jobs WHERE topic_id=?",Integer.class,topic)).isZero();
+  assertThat(store.rows("SELECT triage_tier FROM topic_articles WHERE topic_id=?",topic).get(0).get("triageTier")).isEqualTo("T2");verify(runner,times(1)).analyze(anyString(),any(),any());
  }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, date } from './api';
 import { DraftComposer } from './DraftComposer';
 import './editorial.css';
+import { TriageInbox } from './TriageInbox';
 
 type Editorial = {
   decision: string;
@@ -37,7 +38,12 @@ type Run = {
   status: string;
   message: string;
   createdAt: string;
-  selection?: { eligible: number; selected: Candidate[]; note: string };
+  selection?: {
+    eligible: number;
+    selected: Candidate[];
+    unavailable?: (Candidate & { reason: string })[];
+    note: string;
+  };
   analysis?: {
     id: string;
     status: string;
@@ -47,6 +53,7 @@ type Run = {
 };
 type Board = {
   aiBusy?: boolean;
+  triageBusy?: boolean;
   hidden?: string[];
   settings: { audience: string; automatic: boolean };
   collecting: boolean;
@@ -123,7 +130,11 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
     }
   }
   const latest = board?.runs[0];
-  const active = !!board?.aiBusy || !!board?.collecting || (!!latest && ['SCREENING', 'ANALYZING'].includes(latest.status));
+  const active =
+    !!board?.aiBusy ||
+    !!board?.triageBusy ||
+    !!board?.collecting ||
+    (!!latest && ['SCREENING', 'ANALYZING'].includes(latest.status));
   const readyRun = board?.runs.find((r) => r.analysis?.result);
   const job = readyRun?.analysis;
   const cards = (job?.result?.issues || [])
@@ -147,15 +158,28 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
         </div>
         <h3>{issue.suggestedTitles?.[0] || issue.title}</h3>
         <p>{e?.readerQuestion || issue.angle}</p>
-      <dl>
+        <dl>
           <dt>읽고 얻는 것</dt>
           <dd>{e?.readerBenefit || issue.summary}</dd>
           <dt>추천 판단</dt>
           <dd>{e?.reason || '이전 분석입니다. 새 추천을 실행하면 판단 근거가 추가됩니다.'}</dd>
           <dt>근거 상태</dt>
           <dd>{e?.evidence || issue.uncertainties.join(' ')}</dd>
-      </dl>
-      <details><summary>근거 원문 확인</summary><ul>{readyRun?.selection?.selected.filter(s=>issue.sourceIds.includes(s.id)).map(s=><li key={s.id}><a href={s.url} target="_blank" rel="noreferrer">{s.title}</a></li>)}</ul></details>
+        </dl>
+        <details>
+          <summary>근거 원문 확인</summary>
+          <ul>
+            {readyRun?.selection?.selected
+              .filter((s) => issue.sourceIds.includes(s.id))
+              .map((s) => (
+                <li key={s.id}>
+                  <a href={s.url} target="_blank" rel="noreferrer">
+                    {s.title}
+                  </a>
+                </li>
+              ))}
+          </ul>
+        </details>
         <button className="button primary" onClick={() => setSelected({ job: job!.id, index, issue })}>
           기획 확인 · 글 작성
         </button>
@@ -192,10 +216,11 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
         <div>
           <span className="eyebrow">오늘의 편집 작업실</span>
           <h2>
-            목록을 훑는 대신,
-            <br />쓸 만한 이야기부터.
+            좋은 글은,
+            <br />
+            소재를 고르는 것부터.
           </h2>
-          <p>분야에 맞는 원문을 찾고, 독자에게 도움이 되는 소재를 추립니다.</p>
+          <p>수집 자료를 한국어로 이해하고 우선순위를 정한 뒤, 선택한 소재에 분석을 집중합니다.</p>
         </div>
         <div className="editorial-actions">
           <button
@@ -203,16 +228,18 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
             disabled={busy || active}
             onClick={() => void action('/collect')}
           >
-            {active ? '자료를 검토하고 있습니다…' : '원문 발견부터 추천까지'}
+            {active ? '자료를 검토하고 있습니다…' : '새 자료 수집 · 1차 분류'}
           </button>
           <button
             className="button"
             disabled={busy || active || !board?.candidates.length}
             onClick={() => void action('/recommend')}
           >
-            수집된 자료만 다시 선별
+            1·2티어 상위 후보 집중 분석
           </button>
-          <small>추천에는 AI 구독 사용량이 소모됩니다. 자동으로 글을 게시하지 않습니다.</small>
+          <small>
+            수집 후 최대 30건을 요약·분류합니다. 집중 분석은 따로 실행하며 자동 게시하지 않습니다.
+          </small>
         </div>
       </section>
       {error && (
@@ -244,8 +271,8 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
       </section>
       <div className="editorial-flow">
         <span>① 키워드로 원문 발견</span>
-        <span>② 후보 최대 10건 기획 검토</span>
-        <span>③ 추천 소재 선택 후 작성</span>
+        <span>② 한글 요약·등급 확인</span>
+        <span>③ 최대 5건 원문 집중 분석 → 작성</span>
       </div>
       {board?.collections?.[0] && (
         <details className="editorial-details">
@@ -271,9 +298,22 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
           {latest.selection && <small>{latest.selection.note}</small>}
         </p>
       )}
+      {!!latest?.selection?.unavailable?.length && (
+        <div className="analysis-error">
+          <strong>원문 미확보로 집중 분석에서 제외</strong>
+          <ul>
+            {latest.selection.unavailable.map((c) => (
+              <li key={c.id}>
+                {c.title} · {c.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!latest && (
         <p className="hint">처음에는 위 버튼으로 시작하세요. 사이트 주소를 하나씩 등록할 필요가 없습니다.</p>
       )}
+      <TriageInbox topicId={topicId} blocked={busy || active} />
       {readyRun && (
         <div className="section-heading">
           <div>
@@ -333,24 +373,6 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
         </section>
       )}
       <details className="editorial-details">
-        <summary>후보 선정 근거 · {board?.candidates.length || 0}건</summary>
-        <p>
-          최근 자료 최대 500건 중 최근 30일, 분야 키워드, 숨김 및 작성 이력을 확인합니다. 도메인당 최대 3건을
-          골라 한 출처에 치우치는 것을 줄입니다. 관심 신호가 없다는 것은 인기가 없다는 뜻이 아닙니다.
-        </p>
-        {board?.candidates.slice(0, 30).map((c) => (
-          <div className="editorial-candidate" key={c.id}>
-            <a href={c.url} target="_blank" rel="noreferrer">
-              {c.title}
-            </a>
-            <span>
-              후보 점수 {c.score} · {c.reasons.join(' / ')}
-            </span>
-            {c.signals?.discussionUrl && <a href={c.signals.discussionUrl} target="_blank" rel="noreferrer">관심 신호 원문 · {date(c.signals.observedAt)}</a>}
-          </div>
-        ))}
-      </details>
-      <details className="editorial-details">
         <summary>자동 수집 설정과 연결 상태</summary>
         <p>
           기술 커뮤니티에서 키워드로 외부 원문을 발견합니다. YouTube·네이버 검색은 서버에 API 키가 있을 때
@@ -377,10 +399,11 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
             disabled={busy || active}
             onChange={(e) => void action('/settings', 'PUT', { audience, automatic: e.target.checked })}
           />{' '}
-          수집할 때 검색 출처 자동 연결 · 수집 후 AI 추천 실행
+          수집할 때 키워드 기반 검색 출처 자동 연결
         </label>
         <p>
-          예약 수집에도 적용됩니다. 예약 시간은 분야 설정에서 변경할 수 있고, 서버가 켜져 있어야 실행됩니다.
+          예약 수집에도 적용됩니다. 수집 후에는 1차 분류까지만 자동 실행하고, 원문 집중 분석은 선택한 자료에만
+          실행합니다.
         </p>
       </details>
     </div>

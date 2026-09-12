@@ -952,6 +952,7 @@ export default function App() {
                   )}
                   <div className="analysis-launch">
                     <div>
+                      <button className="button" onClick={()=>setTab('editorial')}>한글 요약·등급별 소재 선별로 이동</button>
                       <strong>선택한 자료로 블로그 소재 찾기 · {selected.length}/20건</strong>
                       <p>
                         게시 기간·매체로 범위를 좁힌 뒤 체크하세요. 페이지를 이동해도 선택은 유지되며, 필터를
@@ -1014,7 +1015,8 @@ export default function App() {
                               />
                             </td>
                             <td className="title-cell">
-                              <button onClick={() => setDetail(a)}>{a.title}</button>
+                              <button onClick={() => setDetail(a)}>{a.triage?.titleKo||a.title}</button>
+                              {a.triage&&<p style={{fontSize:13,lineHeight:1.7,margin:'8px 0'}}><b>{a.triageTier?.replace('T','')}티어</b> · {a.triage.summaryKo}</p>}
                               <small>
                                 {a.sourceName}
                                 {a.author ? ' · ' + a.author : ''}

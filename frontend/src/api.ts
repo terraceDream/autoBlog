@@ -36,6 +36,8 @@ export type Source = {
 };
 export type SourceInput = Omit<Source, 'id' | 'topicId' | 'lastSuccess'>;
 export type Article = {
+  triageTier?: string;
+  triage?: {titleKo:string;summaryKo:string};
   id: string;
   title: string;
   url: string;
@@ -82,7 +84,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   }).catch(() => {
-    throw new Error('로컬 서버에 연결할 수 없습니다. Issue Desk 서버를 실행한 뒤 다시 시도해 주세요.');
+    throw new Error('Issue Desk 서버에 연결할 수 없습니다. 네트워크와 서버 상태를 확인해 주세요.');
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

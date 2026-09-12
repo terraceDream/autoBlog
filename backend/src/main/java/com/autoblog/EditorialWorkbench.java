@@ -26,7 +26,7 @@ public class EditorialWorkbench {
   return Map.of("runId",collection.start(topic,"EDITORIAL"));
  }
  boolean busy(String topic){return triage.busy(topic)||collection.running(topic)||analysis.running(topic)||analysis.runner.isBusy()||store.jdbc().queryForObject("SELECT COUNT(*) FROM editorial_runs WHERE topic_id=? AND status='SCREENING'",Integer.class,topic)>0;}
- @EventListener public void collected(CollectionService.Finished event){try{triage.start(event.topicId(),30);}catch(org.springframework.web.server.ResponseStatusException e){/* Existing screening owns the queue. Remaining rows are visibly PENDING. */}}
+ @EventListener public void collected(CollectionService.Finished event){if(store.rows("SELECT trigger_type FROM runs WHERE id=?",event.runId()).stream().anyMatch(r->"AUTOPILOT".equals(r.get("triggerType"))))return;try{triage.start(event.topicId(),30);}catch(org.springframework.web.server.ResponseStatusException e){/* Existing screening owns the queue. Remaining rows are visibly PENDING. */}}
  public synchronized Map<String,Object> screen(String topic,String collectionId){
   return screen(topic,collectionId,List.of());
  }

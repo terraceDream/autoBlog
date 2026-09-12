@@ -28,6 +28,13 @@ class DraftIntegrationTest {
  }
  Map<String,Object> finish(String id)throws Exception{for(int i=0;i<200;i++){var d=drafts.get(id);if(!Set.of("WRITING","SENDING").contains(d.get("status"))){Thread.sleep(50);return d;}Thread.sleep(20);}throw new AssertionError("timeout");}
  String create(){return ((Map<?,?>)drafts.create(new DraftModels.Create(analysis,0,"입문자 대상으로"))).get("id").toString();}
+ @Test void automationItemReusesDurableDraftWithoutAnotherModelCall()throws Exception{
+  String topic=store.rows("SELECT topic_id FROM analysis_jobs WHERE id=?",analysis).get(0).get("topicId").toString(),run=UUID.randomUUID().toString(),item=UUID.randomUUID().toString(),now=Instant.now().toString();
+  store.jdbc().update("INSERT INTO autopilot_runs(id,topic_id,blog_url,status,stage,message,created_at,updated_at) VALUES(?,?,'https://test.tistory.com','RUNNING','WRITE','',?,?)",run,topic,now,now);
+  store.jdbc().update("INSERT INTO autopilot_items(id,run_id,issue_index,title,category) VALUES(?,?,0,'소재','오늘의 AI 뉴스')",item,run);
+  var request=new DraftModels.Create(analysis,0,"자동 작성");String id=((Map<?,?>)drafts.create(request,item)).get("id").toString();finish(id);
+  assertThat(((Map<?,?>)drafts.create(request,item)).get("id")).isEqualTo(id);verify(runner,times(1)).analyze(anyString(),any(),any());
+ }
  @Test void writesOnlySelectedOriginalAndSanitizesThenPublishesOnce()throws Exception{
   String id=create();var d=finish(id);assertThat(d.get("status")).isEqualTo("READY");
   assertThat(((JsonNode)d.get("result")).path("html").asText()).isEqualTo("<p>설명</p>");

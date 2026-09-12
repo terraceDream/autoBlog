@@ -3,6 +3,7 @@ import { api, date } from './api';
 import { DraftComposer } from './DraftComposer';
 import './editorial.css';
 import { TriageInbox } from './TriageInbox';
+import { Autopilot } from './Autopilot';
 
 type Editorial = {
   decision: string;
@@ -83,6 +84,7 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
     [audience, setAudience] = useState(''),
     [selected, setSelected] = useState<{ job: string; index: number; issue: Issue } | null>(null),
     [notice, setNotice] = useState('');
+  const [autoActive, setAutoActive] = useState(false);
   const selectedPanel = useRef<HTMLElement>(null);
   useEffect(() => {
     selectedPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -131,6 +133,7 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
   }
   const latest = board?.runs[0];
   const active =
+    autoActive ||
     !!board?.aiBusy ||
     !!board?.triageBusy ||
     !!board?.collecting ||
@@ -212,6 +215,7 @@ export function EditorialWorkbench({ topicId, onSources }: { topicId: string; on
   const chosen = selected?.issue;
   return (
     <div className="editorial-workbench">
+      <Autopilot topicId={topicId} onActive={setAutoActive} />
       <section className="editorial-hero">
         <div>
           <span className="eyebrow">오늘의 편집 작업실</span>

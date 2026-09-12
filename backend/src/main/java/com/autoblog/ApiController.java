@@ -65,7 +65,7 @@ public class ApiController {
         long total=Objects.requireNonNull(store.jdbc().queryForObject("SELECT COUNT(*)"+where,Long.class,args.toArray()));
         args.add(size);args.add(page*size);
         var rows=store.rows("SELECT a.*,ta.status,ta.matched_keywords,ta.triage_tier,ta.triage_json"+where+" ORDER BY a.published_at "+(sort.equals("asc")?"ASC":"DESC")+" NULLS LAST,a.collected_at DESC,a.id LIMIT ? OFFSET ?",args.toArray());
-        for(var row:rows){Object raw=row.remove("triageJson");try{row.put("triage",raw==null?null:store.json.readTree(raw.toString()));}catch(Exception ignored){row.put("triage",null);}}
+        for(var row:rows){Object raw=row.remove("triageJson");try{row.put("triage",raw==null?null:store.mapper().readTree(raw.toString()));}catch(Exception ignored){row.put("triage",null);}}
         return new Page<>(rows,total,page,size);
     }
     @GetMapping("/topics/{id}/stats") Object stats(@PathVariable String id) {

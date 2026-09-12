@@ -26,11 +26,16 @@ public class DraftService {
     }
     @PostConstruct void recover(){store.jdbc().update("UPDATE blog_drafts SET status='FAILED',message=? WHERE status='WRITING'","서버 재시작으로 작성이 중단되었습니다.");store.jdbc().update("UPDATE blog_drafts SET status='UNKNOWN',message=? WHERE status='SENDING'","전송 중 서버가 재시작되었습니다. 티스토리에서 저장 여부를 확인하세요. 자동 재전송하지 않습니다.");}
     @PreDestroy void close(){executor.shutdownNow();}
+    public boolean isBusy(){return busy;}
     String encode(Object x){try{return json.writeValueAsString(x);}catch(Exception e){throw new IllegalStateException(e);}}
     public List<Map<String,Object>> list(String analysisId,int index){analysis.job(analysisId);var rows=store.rows("SELECT * FROM blog_drafts WHERE analysis_id=? AND issue_index=? ORDER BY created_at DESC",analysisId,index);rows.forEach(this::decode);return rows;}
     void decode(Map<String,Object> row){for(String key:List.of("inputJson","resultJson")){Object value=row.remove(key);try{row.put(key.equals("inputJson")?"input":"result",value==null?null:json.readTree(value.toString()));}catch(Exception e){throw new IllegalStateException(e);}}if(row.get("result") instanceof JsonNode result&&!result.isNull())try{row.put("previewHtml",DraftImages.render(json.treeToValue(result,Content.class)));}catch(Exception e){throw new IllegalStateException(e);}}
     public Map<String,Object> get(String id){var rows=store.rows("SELECT * FROM blog_drafts WHERE id=?",id);if(rows.isEmpty())throw Store.missing("초안");var row=rows.get(0);decode(row);return row;}
     public synchronized Object create(Create request){
+        return create(request,null);
+    }
+    public synchronized Object create(Create request,String automationItemId){
+        if(automationItemId!=null){var existing=store.rows("SELECT id FROM blog_drafts WHERE automation_item_id=?",automationItemId);if(!existing.isEmpty())return Map.of("id",existing.get(0).get("id"));}
         if(busy||runner.isBusy())throw Store.bad("다른 AI 분석 또는 글 작성·전송이 진행 중입니다. 완료 후 다시 시도해 주세요.");
         var job=analysis.job(request.analysisId());if(!"SUCCESS".equals(job.get("status")))throw Store.bad("완료된 분석만 글로 작성할 수 있습니다.");
         JsonNode result=(JsonNode)job.get("result"),input=(JsonNode)job.get("input");
@@ -41,7 +46,7 @@ public class DraftService {
         input.path("sources").forEach(x->{if(ids.contains(x.path("id").asText()))selected.add(x);});
         String id=UUID.randomUUID().toString(),now=Instant.now().toString();
         Map<String,Object> snapshot=Map.of("issue",issue,"sources",selected,"direction",request.direction());
-        store.jdbc().update("INSERT INTO blog_drafts(id,analysis_id,issue_index,direction,status,input_json,message,created_at,updated_at) VALUES(?,?,?,?,'WRITING',?,'선택한 원문을 확인하고 글을 작성합니다.',?,?)",id,request.analysisId(),request.issueIndex(),request.direction(),encode(snapshot),now,now);
+        store.jdbc().update("INSERT INTO blog_drafts(id,analysis_id,issue_index,direction,status,input_json,message,created_at,updated_at,automation_item_id) VALUES(?,?,?,?,'WRITING',?,'선택한 원문을 확인하고 글을 작성합니다.',?,?,?)",id,request.analysisId(),request.issueIndex(),request.direction(),encode(snapshot),now,now,automationItemId);
         busy=true;executor.submit(()->write(id,issue,selected,request.direction()));return Map.of("id",id);
     }
     void write(String id,JsonNode issue,List<JsonNode> selected,String direction){try{

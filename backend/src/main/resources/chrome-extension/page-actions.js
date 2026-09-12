@@ -73,7 +73,7 @@ export function pageAction(action,payload) {
     }
     if(action==='existing'||action==='saved'){
       if(!location.pathname.startsWith('/manage/posts'))return {ready:false};
-      if(!document.querySelector('.tit_post'))return {ready:false};
+      if(!document.querySelector('.list_post'))return {ready:false};
       const links=[...document.querySelectorAll('.tit_post a')].filter(n=>text(n)===payload.title);
       if(!links.length)return {ready:action==='existing',found:false};
       if(links.length!==1)throw Error('같은 제목의 글이 여러 개 있습니다. 중복 저장하지 않았습니다.');

@@ -32,6 +32,9 @@ public class AutopilotService {
  }
  public synchronized Object resume(String topic,String id){var r=run(id);if(!topic.equals(r.get("topicId")))throw Store.missing("분야의 자동 작성 실행");if(active||!r.get("status").equals("PAUSED"))throw Store.bad("일시 중지한 실행만 이어서 진행할 수 있습니다.");if(editorial.busy(topic))throw Store.bad("다른 작업이 진행 중입니다.");publisher.ensureConnected();state(id,"RUNNING",r.get("stage").toString(),"저장된 진행 상태부터 이어서 실행합니다.");launch(id);return Map.of("id",id);}
  void launch(String id){active=true;worker.submit(()->execute(id));}
+ Map<String,Object> paused(String topic,String id){var r=run(id);if(!topic.equals(r.get("topicId")))throw Store.missing("분야의 자동 작성 실행");if(active||drafts.isBusy()||!"PAUSED".equals(r.get("status")))throw Store.bad("작업이 멈춘 뒤 실행을 정리할 수 있습니다.");return r;}
+ public synchronized Object cancel(String topic,String id){var r=paused(topic,id);state(id,"CANCELLED",r.get("stage").toString(),"실행을 종료했습니다. 기존 초안과 티스토리 글은 보존됩니다. 새 자동 실행을 시작할 수 있습니다.");return Map.of("id",id);}
+ public synchronized Object skip(String topic,String id,String itemId){paused(topic,id);var matches=items(id).stream().filter(i->itemId.equals(i.get("id"))).toList();if(matches.isEmpty())throw Store.missing("자동 작성 항목");var item=matches.get(0);if(Set.of("WRITING","SENDING","SAVED_PRIVATE").contains(Objects.toString(item.get("draftStatus"),"")))throw Store.bad("진행 중이거나 저장 완료된 글은 건너뛸 수 없습니다.");store.jdbc().update("UPDATE autopilot_items SET skipped=TRUE WHERE id=? AND run_id=?",itemId,id);return Map.of("id",itemId);}
  void state(String id,String status,String stage,String message){store.jdbc().update("UPDATE autopilot_runs SET status=?,stage=?,message=?,updated_at=? WHERE id=?",status,stage,message,Instant.now().toString(),id);}
  String ref(String id,String key){return Objects.toString(run(id).get(key),"");}
  void reference(String id,String column,String value){if(!Set.of("collection_id","triage_id","editorial_id","analysis_id").contains(column))throw new IllegalArgumentException();store.jdbc().update("UPDATE autopilot_runs SET "+column+"=?,updated_at=? WHERE id=?",value,Instant.now().toString(),id);}
@@ -64,8 +67,9 @@ public class AutopilotService {
    indices.sort(Comparator.<Integer>comparingInt(i->result.path("issues").get(i).path("editorial").path("priority").asInt()).reversed());
    for(int index:indices.stream().limit(5).toList()){if(items(id).stream().anyMatch(i->((Number)i.get("issueIndex")).intValue()==index))continue;var issue=result.path("issues").get(index);store.jdbc().update("INSERT INTO autopilot_items(id,run_id,issue_index,title,category) VALUES(?,?,?,?,?)",UUID.randomUUID().toString(),id,index,issue.path("title").asText(),category(issue));}
   }
-  int saved=0,failed=0;
+  int saved=0,failed=0,skipped=0;
   for(var item:items(id)){
+   if(Boolean.TRUE.equals(item.get("skipped"))){skipped++;continue;}
    String itemId=item.get("id").toString();int index=((Number)item.get("issueIndex")).intValue();String category=item.get("category").toString();
    String draftId=Objects.toString(item.get("draftId"),"");
    if(draftId.isEmpty()){state(id,"RUNNING","WRITE",(saved+1)+"번째 글을 작성합니다. 분류: "+category);var created=(Map<?,?>)drafts.create(new DraftModels.Create(analysisId,index,"자동 비공개 검토용 글입니다. 카테고리는 반드시 '"+category+"'로 작성하세요. 원문 전체를 읽고 담백한 합니다·입니다체로 배경과 실용적 인사이트를 설명하세요."),itemId);draftId=created.get("id").toString();}
@@ -82,6 +86,6 @@ public class AutopilotService {
    while(drafts.isBusy())Thread.sleep(100);
    if(!"SAVED_PRIVATE".equals(published.get("status")))throw Store.bad("티스토리 저장 확인이 필요합니다. "+published.get("message"));saved++;
   }
-  state(id,failed>0?"PARTIAL":"COMPLETE","DONE",saved+"개 글을 티스토리에 비공개 저장했습니다."+(failed>0?" 작성 실패 "+failed+"건은 초안에서 확인하세요.":saved<5?" 근거가 충분한 추천만 작성하므로 5개보다 적을 수 있습니다.":" 검토 후 공개로 전환하면 됩니다."));
+  state(id,failed>0||skipped>0?"PARTIAL":"COMPLETE","DONE",saved+"개 글을 티스토리에 비공개 저장했습니다. 건너뜀 "+skipped+"건."+(failed>0?" 작성 실패 "+failed+"건은 초안에서 확인하세요.":" 검토 후 공개로 전환하면 됩니다."));
  }catch(Exception e){state(id,"PAUSED",ref(id,"stage"),e instanceof org.springframework.web.server.ResponseStatusException r?r.getReason():"자동 작성이 중단됐습니다. 완료된 글은 유지하며 저장 상태 확인 후 이어서 실행할 수 있습니다.");}finally{active=false;}}
 }

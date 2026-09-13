@@ -11,6 +11,7 @@ type Item = {
   draftStatus?: string;
   draftMessage?: string;
   remoteUrl?: string;
+  skipped?: boolean;
 };
 type Run = {
   id: string;
@@ -83,6 +84,18 @@ export function Autopilot({ topicId, onActive }: { topicId: string; onActive: (a
       setBusy(false);
     }
   }
+  async function recover(path: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/topics/${topicId}/autopilot/${path}`, 'POST');
+      setBoard(await api<Board>(`/topics/${topicId}/autopilot`));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const run = board?.runs[0],
     running = busy || board?.active;
   return (
@@ -112,6 +125,17 @@ export function Autopilot({ topicId, onActive }: { topicId: string; onActive: (a
             ? '멈춘 지점부터 이어서 실행'
             : '수집부터 TOP 5 비공개 저장'}
       </button>
+      {run?.status === 'PAUSED' && (
+        <button className="button" disabled={!!running} onClick={() => void recover(`${run.id}/cancel`)}>
+          이 실행 종료 · 새로 시작 가능
+        </button>
+      )}
+      {run?.status === 'PAUSED' && (
+        <small>
+          실행을 종료해도 작성한 초안과 티스토리 글은 삭제되지 않습니다. 같은 오류가 반복되면 해당 글만 건너뛸
+          수도 있습니다.
+        </small>
+      )}
       <small>
         AI 사용량이 소모됩니다. 근거가 충분한 추천만 작성하므로 5개보다 적을 수 있습니다. 로그인된 Chrome과
         Issue Desk 확장 연결을 켜 두세요. 공개 전환은 직접 검토한 후 진행합니다.
@@ -124,8 +148,13 @@ export function Autopilot({ topicId, onActive }: { topicId: string; onActive: (a
       {run && (
         <div className="autopilot-progress" role="status">
           <strong>
-            {run.status === 'PAUSED' ? '확인 후 이어서 실행' : stages[run.stage] || run.stage} ·{' '}
-            {run.items.filter((i) => i.draftStatus === 'SAVED_PRIVATE').length}/{run.items.length || 5}개 저장
+            {run.status === 'CANCELLED'
+              ? '종료한 실행'
+              : run.status === 'PAUSED'
+                ? '확인 후 이어서 실행'
+                : stages[run.stage] || run.stage}{' '}
+            · {run.items.filter((i) => i.draftStatus === 'SAVED_PRIVATE').length}/{run.items.length || 5}개
+            저장
           </strong>
           <p>{run.message}</p>
           <small>
@@ -140,7 +169,8 @@ export function Autopilot({ topicId, onActive }: { topicId: string; onActive: (a
               <div>
                 <strong>{item.title}</strong>
                 <p>
-                  {item.category} · {statuses[item.draftStatus || ''] || '작성 대기'}
+                  {item.category} ·{' '}
+                  {item.skipped ? '건너뜀 (기존 초안 보존)' : statuses[item.draftStatus || ''] || '작성 대기'}
                 </p>
                 {item.draftMessage && <small>{item.draftMessage}</small>}
               </div>
@@ -154,6 +184,17 @@ export function Autopilot({ topicId, onActive }: { topicId: string; onActive: (a
                   초안·저장 상태 확인
                 </button>
               )}
+              {run.status === 'PAUSED' &&
+                !item.skipped &&
+                !['SAVED_PRIVATE', 'WRITING', 'SENDING'].includes(item.draftStatus || '') && (
+                  <button
+                    className="button"
+                    disabled={!!running}
+                    onClick={() => void recover(`${run.id}/items/${item.id}/skip`)}
+                  >
+                    이 글 건너뛰기
+                  </button>
+                )}
             </li>
           ))}
         </ol>

@@ -49,12 +49,7 @@ public class EditorialWorkbench {
   var hidden=store.jdbc().query("SELECT article_id FROM topic_articles WHERE topic_id=? AND status='HIDDEN'",(r,n)->r.getString(1),topic);
   return Map.of("settings",settings(topic),"collecting",collection.running(topic),"aiBusy",analysis.runner.isBusy(),"triageBusy",triage.busy(topic),"runs",runs,"candidates",candidates,"modules",collection.modules(),"sources",store.sources(topic),"collections",collections,"hidden",hidden);
  }
- private Set<String> drafted(String topic){
-  Set<String> ids=new HashSet<>();
-  for(var row:store.rows("SELECT b.issue_index,a.result_json FROM blog_drafts b JOIN analysis_jobs a ON a.id=b.analysis_id WHERE a.topic_id=? AND b.status<>'FAILED'",topic))try{
-   var issue=json.readTree(row.get("resultJson").toString()).path("issues").path(((Number)row.get("issueIndex")).intValue());issue.path("sourceIds").forEach(v->ids.add(v.asText()));
-  }catch(Exception ignored){}return ids;
- }
+ private Set<String> drafted(String topic){return DraftHistory.used(store,json);}
  public List<Map<String,Object>> candidates(String topicId){
   var topic=store.topic(topicId);var used=drafted(topicId);List<Map<String,Object>> ranked=new ArrayList<>();
   var rows=store.rows("SELECT a.*,ta.status FROM articles a JOIN topic_articles ta ON ta.article_id=a.id WHERE ta.topic_id=? AND ta.status<>'HIDDEN' ORDER BY a.published_at DESC NULLS LAST,a.collected_at DESC LIMIT 500",topicId);
@@ -74,15 +69,16 @@ public class EditorialWorkbench {
   ranked.sort(Comparator.<Map<String,Object>>comparingInt(r->((Number)r.get("score")).intValue()).reversed().thenComparing(r->r.get("id").toString()));return ranked;
  }
  static boolean matches(String text,String keyword){String k=keyword.toLowerCase(Locale.ROOT);return k.matches("[a-z0-9 ]+")?java.util.regex.Pattern.compile("(?<![a-z0-9])"+java.util.regex.Pattern.quote(k)+"(?![a-z0-9])").matcher(text).find():text.contains(k);}
+ static boolean recent(Map<String,Object> row){try{return Instant.parse(Objects.toString(row.get("publishedAt"),Objects.toString(row.get("collectedAt"),""))).isAfter(Instant.now().minus(Duration.ofDays(7)));}catch(Exception e){return false;}}
  void select(String id,String topic,List<String> selectedIds){try{
   var used=drafted(topic);
-  var ranked=store.rows("SELECT a.id,a.title,a.url,ta.triage_score score,ta.triage_tier tier FROM articles a JOIN topic_articles ta ON a.id=ta.article_id WHERE ta.topic_id=? AND ta.status<>'HIDDEN' AND ta.triage_tier<>'PENDING' ORDER BY CASE ta.triage_tier WHEN 'T1' THEN 0 WHEN 'T2' THEN 1 ELSE 2 END,ta.triage_score DESC,a.collected_at DESC",topic).stream().filter(r->!used.contains(r.get("id").toString())).filter(r->selectedIds.isEmpty()?Set.of("T1","T2").contains(r.get("tier")):selectedIds.contains(r.get("id").toString())).toList();
+  var ranked=store.rows("SELECT a.id,a.title,a.url,a.published_at,a.collected_at,ta.triage_score score,ta.triage_tier tier FROM articles a JOIN topic_articles ta ON a.id=ta.article_id WHERE ta.topic_id=? AND ta.status<>'HIDDEN' AND ta.triage_tier<>'PENDING' ORDER BY CASE ta.triage_tier WHEN 'T1' THEN 0 WHEN 'T2' THEN 1 ELSE 2 END,ta.triage_score DESC,a.collected_at DESC",topic).stream().filter(r->!used.contains(r.get("id").toString())).filter(r->!selectedIds.isEmpty()||recent(r)).filter(r->selectedIds.isEmpty()?Set.of("T1","T2").contains(r.get("tier")):selectedIds.contains(r.get("id").toString())).toList();
   List<Map<String,Object>> chosen=new ArrayList<>();Map<String,Integer> domains=new HashMap<>();
   for(var row:ranked){String host;try{host=java.net.URI.create(row.get("url").toString()).getHost();}catch(Exception e){continue;}
    if(selectedIds.isEmpty()&&domains.getOrDefault(host,0)>=2)continue;domains.merge(host,1,Integer::sum);chosen.add(row);if(chosen.size()==5)break;
   }
   store.jdbc().update("UPDATE editorial_runs SET selection_json=? WHERE id=?",store.encode(Map.of("eligible",ranked.size(),"selected",chosen,"note","분류된 자료 중 최대 5건의 원문을 확인합니다. 1차 등급은 게재 확정이나 예상 클릭률이 아닙니다.")),id);
-  if(chosen.isEmpty()){store.jdbc().update("UPDATE editorial_runs SET status='EMPTY',message='분류된 1·2티어 후보가 없습니다. 먼저 1차 분류를 실행하거나 목록에서 직접 자료를 선택하세요.',finished_at=? WHERE id=?",Instant.now().toString(),id);return;}
+  if(chosen.isEmpty()){store.jdbc().update("UPDATE editorial_runs SET status='EMPTY',message='최근 7일 내 미작성 1·2티어 후보가 없습니다. 이전 작성 원문과 오래된 자료는 자동으로 재사용하지 않습니다.',finished_at=? WHERE id=?",Instant.now().toString(),id);return;}
   // Read full public originals before deciding whether the topic has enough evidence.
   List<Map<String,Object>> unavailable=new ArrayList<>();
   for(var candidate:chosen){var rows=store.rows("SELECT * FROM articles WHERE id=?",candidate.get("id"));var row=rows.get(0);

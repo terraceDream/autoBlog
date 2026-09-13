@@ -81,7 +81,8 @@ public class TriageService {
  }
  void execute(String id,String topic,int limit){int processed=0;try{
   if(runner.isBusy())throw Store.bad("다른 AI 작업이 진행 중입니다. 분류 대기 자료는 유지되며 완료 후 다시 실행할 수 있습니다.");
-  var rows=store.rows("SELECT a.id,a.title,a.screening_excerpt excerpt,a.published_at,a.source_name,a.signals,ta.triage_hash FROM articles a JOIN topic_articles ta ON a.id=ta.article_id WHERE ta.topic_id=? AND ta.status<>'HIDDEN' AND ta.triage_tier='PENDING' ORDER BY ta.triage_score DESC,a.collected_at DESC,a.id LIMIT ?",topic,limit);
+  var used=DraftHistory.used(store,json);
+  var rows=store.rows("SELECT a.id,a.title,a.screening_excerpt excerpt,a.published_at,a.source_name,a.signals,ta.triage_hash FROM articles a JOIN topic_articles ta ON a.id=ta.article_id WHERE ta.topic_id=? AND ta.status<>'HIDDEN' AND ta.triage_tier='PENDING' ORDER BY ta.triage_score DESC,a.collected_at DESC,a.id",topic).stream().filter(r->!used.contains(r.get("id").toString())).limit(limit).toList();
   String ctx=context(topic);
   for(int start=0;start<rows.size();start+=BATCH){if(Thread.currentThread().isInterrupted())throw new InterruptedException();var batch=rows.subList(start,Math.min(start+BATCH,rows.size()));
    store.jdbc().update("UPDATE triage_runs SET status='RUNNING',message=? WHERE id=?",processed+"/"+rows.size()+"건 완료 · 짧은 설명으로 1차 분류 중",id);
@@ -105,7 +106,7 @@ public class TriageService {
   long total=store.jdbc().queryForObject("SELECT COUNT(*)"+where,Long.class,args.toArray());args.add(page*20);
   String order=sort.equals("newest")?"a.collected_at DESC": "CASE ta.triage_tier WHEN 'T1' THEN 0 WHEN 'T2' THEN 1 WHEN 'T3' THEN 2 ELSE 3 END,ta.triage_score DESC,a.collected_at DESC";
   var rows=store.rows("SELECT a.id,a.title,a.url,a.source_name,a.published_at,a.collected_at,a.coverage,a.original_status,a.original_message,ta.status,ta.triage_tier,ta.triage_score,ta.triage_json,ta.triage_at"+where+" ORDER BY "+order+",a.id LIMIT 20 OFFSET ?",args.toArray());
-  Set<String> drafted=new HashSet<>();for(var draft:store.rows("SELECT b.input_json FROM blog_drafts b JOIN analysis_jobs j ON b.analysis_id=j.id WHERE j.topic_id=? AND b.status<>'FAILED'",topic))try{json.readTree(draft.get("inputJson").toString()).path("sources").forEach(s->drafted.add(s.path("id").asText()));}catch(Exception ignored){}
+  Set<String> drafted=DraftHistory.used(store,json);
   for(var row:rows){row.put("drafted",drafted.contains(row.get("id").toString()));Object raw=row.remove("triageJson");try{row.put("triage",raw==null?null:json.readTree(raw.toString()));}catch(Exception ignored){row.put("triage",null);}}
   var counts=store.rows("SELECT ta.triage_tier tier,COUNT(*) count"+base+" GROUP BY ta.triage_tier",topic);
   var runs=store.rows("SELECT * FROM triage_runs WHERE topic_id=? ORDER BY created_at DESC LIMIT 1",topic);

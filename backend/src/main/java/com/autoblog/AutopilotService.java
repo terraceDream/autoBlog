@@ -19,7 +19,7 @@ public class AutopilotService {
  public AutopilotService(Store s,CollectionService c,SourceDiscovery d,TriageService t,EditorialWorkbench e,AnalysisService a,DraftService drafts,TistoryPublisher p){store=s;collection=c;discovery=d;triage=t;editorial=e;analysis=a;this.drafts=drafts;publisher=p;}
  @PostConstruct void recover(){store.jdbc().update("UPDATE autopilot_runs SET status='PAUSED',message='서버 재시작으로 멈췄습니다. 저장 상태를 확인하고 이어서 실행하세요.',updated_at=? WHERE status='RUNNING'",Instant.now().toString());}
  @PreDestroy void close(){worker.shutdownNow();}
- public Map<String,Object> board(String topic){store.topic(topic);var runs=store.rows("SELECT * FROM autopilot_runs WHERE topic_id=? ORDER BY created_at DESC LIMIT 10",topic);for(var r:runs)r.put("items",items(r.get("id").toString()));return Map.of("active",active,"runs",runs);}
+ public Map<String,Object> board(String topic){store.topic(topic);var runs=store.rows("SELECT * FROM autopilot_runs WHERE topic_id=? ORDER BY created_at DESC LIMIT 30",topic);for(var r:runs){r.put("items",items(r.get("id").toString()));r.put("logs",store.rows("SELECT status,stage,message,created_at FROM autopilot_logs WHERE run_id=? ORDER BY created_at,id",r.get("id")));}return Map.of("active",active,"runs",runs);}
  List<Map<String,Object>> items(String run){return store.rows("SELECT i.*,b.id draft_id,b.status draft_status,b.message draft_message,b.remote_url FROM autopilot_items i LEFT JOIN blog_drafts b ON b.automation_item_id=i.id WHERE i.run_id=? ORDER BY i.issue_index",run);}
  Map<String,Object> run(String id){var rows=store.rows("SELECT * FROM autopilot_runs WHERE id=?",id);if(rows.isEmpty())throw Store.missing("자동 작성 실행");return rows.get(0);}
  public synchronized Map<String,Object> start(String topic,String blog){
@@ -31,11 +31,12 @@ public class AutopilotService {
   store.jdbc().update("INSERT INTO autopilot_runs(id,topic_id,blog_url,status,stage,message,created_at,updated_at) VALUES(?,?,?,'RUNNING','COLLECT','수집부터 최대 5개 글의 비공개 저장까지 진행합니다.',?,?)",id,topic,blog.replaceAll("/$",""),now,now);launch(id);return Map.of("id",id);
  }
  public synchronized Object resume(String topic,String id){var r=run(id);if(!topic.equals(r.get("topicId")))throw Store.missing("분야의 자동 작성 실행");if(active||!r.get("status").equals("PAUSED"))throw Store.bad("일시 중지한 실행만 이어서 진행할 수 있습니다.");if(editorial.busy(topic))throw Store.bad("다른 작업이 진행 중입니다.");publisher.ensureConnected();state(id,"RUNNING",r.get("stage").toString(),"저장된 진행 상태부터 이어서 실행합니다.");launch(id);return Map.of("id",id);}
- void launch(String id){active=true;worker.submit(()->execute(id));}
+ void launch(String id){log(id,"RUNNING",ref(id,"stage"),"실행 시작: "+id);active=true;worker.submit(()->execute(id));}
  Map<String,Object> paused(String topic,String id){var r=run(id);if(!topic.equals(r.get("topicId")))throw Store.missing("분야의 자동 작성 실행");if(active||drafts.isBusy()||!"PAUSED".equals(r.get("status")))throw Store.bad("작업이 멈춘 뒤 실행을 정리할 수 있습니다.");return r;}
  public synchronized Object cancel(String topic,String id){var r=paused(topic,id);state(id,"CANCELLED",r.get("stage").toString(),"실행을 종료했습니다. 기존 초안과 티스토리 글은 보존됩니다. 새 자동 실행을 시작할 수 있습니다.");return Map.of("id",id);}
  public synchronized Object skip(String topic,String id,String itemId){paused(topic,id);var matches=items(id).stream().filter(i->itemId.equals(i.get("id"))).toList();if(matches.isEmpty())throw Store.missing("자동 작성 항목");var item=matches.get(0);if(Set.of("WRITING","SENDING","SAVED_PRIVATE").contains(Objects.toString(item.get("draftStatus"),"")))throw Store.bad("진행 중이거나 저장 완료된 글은 건너뛸 수 없습니다.");store.jdbc().update("UPDATE autopilot_items SET skipped=TRUE WHERE id=? AND run_id=?",itemId,id);return Map.of("id",itemId);}
- void state(String id,String status,String stage,String message){store.jdbc().update("UPDATE autopilot_runs SET status=?,stage=?,message=?,updated_at=? WHERE id=?",status,stage,message,Instant.now().toString(),id);}
+ void log(String id,String status,String stage,String message){store.jdbc().update("INSERT INTO autopilot_logs(id,run_id,status,stage,message,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID().toString(),id,status,stage,message,Instant.now().toString());}
+ void state(String id,String status,String stage,String message){store.jdbc().update("UPDATE autopilot_runs SET status=?,stage=?,message=?,updated_at=? WHERE id=?",status,stage,message,Instant.now().toString(),id);log(id,status,stage,message);}
  String ref(String id,String key){return Objects.toString(run(id).get(key),"");}
  void reference(String id,String column,String value){if(!Set.of("collection_id","triage_id","editorial_id","analysis_id").contains(column))throw new IllegalArgumentException();store.jdbc().update("UPDATE autopilot_runs SET "+column+"=?,updated_at=? WHERE id=?",value,Instant.now().toString(),id);}
  Map<String,Object> await(Supplier<Map<String,Object>> read,Set<String> pending)throws Exception{long deadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(25);while(true){if(Thread.currentThread().isInterrupted())throw new InterruptedException();var row=read.get();if(!pending.contains(row.get("status")))return row;if(System.nanoTime()>deadline)throw Store.bad("작업 대기 시간이 길어 중지했습니다. 실행 상태를 확인한 뒤 이어서 실행하세요.");Thread.sleep(300);}}
@@ -69,14 +70,14 @@ public class AutopilotService {
   }
   int saved=0,failed=0,skipped=0;
   for(var item:items(id)){
-   if(Boolean.TRUE.equals(item.get("skipped"))){skipped++;continue;}
+   if(Boolean.TRUE.equals(item.get("skipped"))){skipped++;log(id,"RUNNING","WRITE","건너뜀: "+item.get("title"));continue;}
    String itemId=item.get("id").toString();int index=((Number)item.get("issueIndex")).intValue();String category=item.get("category").toString();
    String draftId=Objects.toString(item.get("draftId"),"");
    if(draftId.isEmpty()){state(id,"RUNNING","WRITE",(saved+1)+"번째 글을 작성합니다. 분류: "+category);var created=(Map<?,?>)drafts.create(new DraftModels.Create(analysisId,index,"자동 비공개 검토용 글입니다. 카테고리는 반드시 '"+category+"'로 작성하세요. 원문 전체를 읽고 담백한 합니다·입니다체로 배경과 실용적 인사이트를 설명하세요."),itemId);draftId=created.get("id").toString();}
    final String current=draftId;var draft=await(()->drafts.get(current),Set.of("WRITING","SENDING"));while(drafts.isBusy())Thread.sleep(100);String status=draft.get("status").toString();
-   if(status.equals("SAVED_PRIVATE")){saved++;continue;}
+   if(status.equals("SAVED_PRIVATE")){saved++;log(id,"RUNNING","SAVE","기존 저장 확인: "+item.get("title"));continue;}
    if(status.equals("UNKNOWN"))throw Store.bad("저장 여부가 불확실한 글이 있습니다. 티스토리에서 확인 후 해당 초안을 처리해야 이어갈 수 있습니다. 자동 재전송하지 않습니다.");
-   if(status.equals("FAILED")){failed++;continue;}
+   if(status.equals("FAILED")){failed++;log(id,"FAILED","WRITE","작성 실패: "+item.get("title")+" · "+draft.get("message"));continue;}
    if(status.equals("EDITOR_READY")){drafts.retry(current,false);draft=drafts.get(current);}
    if(!Set.of("READY","EDITOR_READY").contains(draft.get("status")))throw Store.bad("초안 상태를 확인해 주세요.");
    JsonNode content=(JsonNode)draft.get("result");DraftModels.Content typed=store.mapper().treeToValue(content,DraftModels.Content.class);
@@ -84,7 +85,7 @@ public class AutopilotService {
    state(id,"RUNNING","SAVE",(saved+1)+"번째 글을 기존 Chrome에서 비공개로 저장합니다.");drafts.publish(current,new DraftModels.Publish(blog));
    var published=await(()->drafts.get(current),Set.of("SENDING"));
    while(drafts.isBusy())Thread.sleep(100);
-   if(!"SAVED_PRIVATE".equals(published.get("status")))throw Store.bad("티스토리 저장 확인이 필요합니다. "+published.get("message"));saved++;
+   if(!"SAVED_PRIVATE".equals(published.get("status")))throw Store.bad("티스토리 저장 확인이 필요합니다. "+published.get("message"));saved++;log(id,"RUNNING","SAVE","비공개 저장 완료: "+item.get("title"));
   }
   state(id,failed>0||skipped>0?"PARTIAL":"COMPLETE","DONE",saved+"개 글을 티스토리에 비공개 저장했습니다. 건너뜀 "+skipped+"건."+(failed>0?" 작성 실패 "+failed+"건은 초안에서 확인하세요.":" 검토 후 공개로 전환하면 됩니다."));
  }catch(Exception e){state(id,"PAUSED",ref(id,"stage"),e instanceof org.springframework.web.server.ResponseStatusException r?r.getReason():"자동 작성이 중단됐습니다. 완료된 글은 유지하며 저장 상태 확인 후 이어서 실행할 수 있습니다.");}finally{active=false;}}

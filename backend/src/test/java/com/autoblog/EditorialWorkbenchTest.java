@@ -34,6 +34,18 @@ class EditorialWorkbenchTest {
   assertThat(ranked.get(1).get("reasons").toString()).contains("관심 신호 미확인");
  }
  @Test void preferencePersistsAndDefaultsToManual(){assertThat(workbench.settings(topic).get("automatic")).isEqualTo(false);workbench.settings(topic,"일반 독자",true);assertThat(workbench.settings(topic).get("audience")).isEqualTo("일반 독자");assertThat(discovery.automatic(topic)).isTrue();}
+ @Test void sourceUsedInAnotherTopicIsExcludedButFailedUnwrittenDraftIsRetryable(){
+  article("AI 새 모델","UNREAD","{}",1);String source=store.rows("SELECT id FROM articles").get(0).get("id").toString(),other=UUID.randomUUID().toString(),job=UUID.randomUUID().toString(),draft=UUID.randomUUID().toString(),now=Instant.now().toString();
+  store.jdbc().update("INSERT INTO topics(id,name,description,instructions,keywords,exclusions,tags,language,region,active,schedule_enabled,cron,timezone,created_at,updated_at) SELECT ?,name,description,instructions,keywords,exclusions,tags,language,region,active,schedule_enabled,cron,timezone,created_at,updated_at FROM topics WHERE id=?",other,topic);
+  store.jdbc().update("INSERT INTO analysis_jobs(id,topic_id,request_hash,mode,direction,status,article_count,input_chars,input_json,message,created_at) VALUES(?,?,'hash','FULL','','SUCCESS',1,1,'{}','',?)",job,other,now);
+  store.jdbc().update("INSERT INTO blog_drafts(id,analysis_id,issue_index,direction,status,input_json,message,created_at,updated_at) VALUES(?,?,0,'','READY',?,'',?,?)",draft,job,store.encode(Map.of("sources",List.of(Map.of("id",source)))),now,now);
+  assertThat(workbench.candidates(topic)).isEmpty();
+  store.jdbc().update("UPDATE blog_drafts SET status='FAILED' WHERE id=?",draft);
+  assertThat(workbench.candidates(topic)).hasSize(1);
+  store.jdbc().update("UPDATE blog_drafts SET result_json='{}' WHERE id=?",draft);
+  assertThat(workbench.candidates(topic)).isEmpty();
+ }
+ @Test void automaticSelectionUsesPublicationDateBeforeCollectionDate(){String now=Instant.now().toString();assertThat(EditorialWorkbench.recent(Map.of("publishedAt",Instant.now().minusSeconds(864000).toString(),"collectedAt",now))).isFalse();assertThat(EditorialWorkbench.recent(Map.of("collectedAt",now))).isTrue();}
  @Test void collectionScreensWithoutStartingExpensiveAnalysis()throws Exception{
   var hit=Map.of("title","AI 모델 운영","url","https://example.com/story","objectID","123","author","writer","story_text","원문 설명 ".repeat(60),"created_at_i",Instant.now().getEpochSecond(),"points",20,"num_comments",4);
   when(http.get(anyString(),anyMap())).thenReturn(json.writeValueAsBytes(Map.of("hits",List.of(hit))));

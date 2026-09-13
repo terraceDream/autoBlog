@@ -1,0 +1,335 @@
+.naver-export {
+  margin-top: 22px;
+  border: 1px solid #bedfd0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+.naver-export-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 18px;
+  border: 0;
+  text-align: left;
+  background: #f1faf5;
+}
+.naver-export-toggle strong,
+.naver-export-toggle small {
+  display: block;
+}
+.naver-export-toggle strong {
+  color: #175739;
+}
+.naver-export-toggle small {
+  margin-top: 3px;
+  color: #567967;
+}
+.naver-export-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 35px;
+  height: 35px;
+  border-radius: 8px;
+  background: #168245;
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+}
+.naver-export-chevron {
+  margin-left: auto;
+  color: #367453;
+  font-size: 24px;
+}
+.naver-export-content {
+  padding: 18px;
+}
+.naver-export-saved {
+  color: #496454;
+  font-size: 13px;
+}
+.naver-export-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 14px 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.naver-export-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.naver-export-steps b {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e4f2e9;
+  color: #18603c;
+  font-size: 11px;
+}
+.naver-export-note {
+  color: #687d74;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.naver-export-metadata {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 18px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #e4eae6;
+  border-radius: 8px;
+}
+.naver-export-metadata > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.naver-export-metadata strong {
+  font-size: 14px;
+}
+.naver-export-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #738378;
+  font-size: 11px;
+}
+.naver-export-format {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  background: #f6f8f6;
+  border-radius: 8px;
+}
+.naver-export .naver-export-format label {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  color: #526a5c;
+  font-size: 12px;
+}
+.naver-export .naver-export-format select {
+  min-width: 105px;
+  padding: 7px 10px;
+  min-height: 36px;
+}
+.naver-export-format p {
+  margin: 0 0 3px auto;
+  color: #526a5c;
+  font-size: 12px;
+}
+.naver-export-format p span {
+  color: #7b8c82;
+  font-size: 11px;
+}
+.naver-export label.naver-export-image-option {
+  display: flex;
+  align-items: start;
+  gap: 9px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.naver-export .naver-export-image-option input[type='checkbox'] {
+  margin: 3px 0 0;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  flex: 0 0 16px;
+}
+.naver-export-image-option small {
+  display: block;
+  margin-top: 3px;
+}
+.naver-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.naver-export button.button {
+  font-size: 12px;
+  min-height: 35px;
+  padding: 7px 11px;
+  white-space: normal;
+  margin: 0;
+}
+.naver-export .button.naver-export-primary {
+  background: #168245;
+  border-color: #168245;
+  color: white;
+}
+.naver-export .button.naver-export-primary:hover:not(:disabled) {
+  background: #116b37;
+  border-color: #116b37;
+  color: white;
+}
+.naver-export-notice,
+.naver-export-error {
+  margin: 12px 0;
+  padding: 11px 13px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.naver-export-notice {
+  background: #edf7f0;
+  color: #285e3c;
+}
+.naver-export-error {
+  background: #fff0ed;
+  color: #a24132;
+}
+.naver-export-fallback {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 13px;
+  background: #fff8e8;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.naver-export-fallback textarea {
+  font-size: 13px;
+}
+.naver-export-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(240px, 1fr);
+  align-items: start;
+  gap: 16px;
+  margin-top: 20px;
+}
+.naver-export-block-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+  margin: 0 0 10px;
+}
+.naver-export-block-heading h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+.naver-export-block-heading > span {
+  font-size: 11px;
+  color: #78877f;
+}
+.naver-export-preview {
+  min-width: 0;
+}
+.naver-export-preview iframe {
+  display: block;
+  width: 100%;
+  height: 690px;
+  background: white;
+  border: 1px solid #e0e7e2;
+  border-radius: 8px;
+}
+.naver-export-assets {
+  min-width: 0;
+}
+.naver-export-assets > .naver-export-block-heading:not(:first-child) {
+  margin-top: 24px;
+}
+.naver-export-asset {
+  margin-bottom: 10px;
+  padding: 13px;
+  border: 1px solid #e0e7e2;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.naver-export-asset-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 9px;
+}
+.naver-export-asset-title > span {
+  font-size: 11px;
+  color: #6f8175;
+}
+.naver-export-credit {
+  margin-top: 8px;
+  color: #6b7b71;
+  font-size: 11px;
+}
+.naver-export-thumbnail {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  background: #f6f8f6;
+}
+.naver-export-asset-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  color: #247c50;
+  font-size: 11px;
+}
+.naver-export-asset-links a {
+  text-decoration: underline;
+}
+.naver-export-warnings {
+  margin-top: 18px;
+  padding: 13px 16px;
+  background: #f8f9f7;
+  border-radius: 8px;
+  color: #66705e;
+  font-size: 12px;
+}
+.naver-export-warnings ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.naver-export-warnings li + li {
+  margin-top: 5px;
+}
+@media (max-width: 900px) {
+  .naver-export-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .naver-export-preview iframe {
+    height: 520px;
+  }
+}
+@media (max-width: 560px) {
+  .naver-export-content,
+  .naver-export-toggle {
+    padding: 13px;
+  }
+  .naver-export-metadata {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .naver-export-metadata > button {
+    justify-self: start;
+    margin-bottom: 5px;
+  }
+  .naver-export-format {
+    gap: 9px;
+  }
+  .naver-export-format p {
+    margin: 0;
+  }
+  .naver-export .naver-export-format select {
+    min-width: 90px;
+  }
+}

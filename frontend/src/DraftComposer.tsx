@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, date } from './api';
 import blogConfig from './blog-config.json';
+import { NaverExport } from './NaverExport';
 
 type DraftImage = { url: string; sourceUrl: string; credit: string; license: string; licenseUrl: string; caption: string; afterParagraph: number; rightsConfirmed: boolean };
 type Content = { title: string; html: string; category: string; tags: string[]; checks: string[]; images?: DraftImage[] };
@@ -170,6 +171,7 @@ export function DraftComposer({ analysisId, issueIndex, generationBlocked=false 
           )}
           {content && (
             <>
+              <NaverExport draftId={draft.id} revisionKey={stored} />
               <label>
                 제목
                 <input
